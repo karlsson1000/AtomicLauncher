@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
+use std::collections::HashMap;
 
 // ===== PUBLIC API MODELS =====
 
@@ -171,6 +172,41 @@ pub struct MinecraftLoginResponse {
 pub struct MinecraftProfile {
     pub id: Uuid,
     pub name: Arc<str>,
+}
+
+// ===== MULTI-ACCOUNT MODELS =====
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StoredAccount {
+    pub uuid: String,
+    pub username: String,
+    pub access_token: String,
+    pub added_at: String,
+    pub last_used: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AccountsData {
+    pub accounts: HashMap<String, StoredAccount>,
+    pub active_account_uuid: Option<String>,
+}
+
+impl Default for AccountsData {
+    fn default() -> Self {
+        Self {
+            accounts: HashMap::new(),
+            active_account_uuid: None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AccountInfo {
+    pub uuid: String,
+    pub username: String,
+    pub is_active: bool,
+    pub added_at: String,
+    pub last_used: Option<String>,
 }
 
 // ===== MINECRAFT VERSION MODELS =====

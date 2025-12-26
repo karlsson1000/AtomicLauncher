@@ -13,6 +13,8 @@ use tauri::Emitter;
 use std::path::PathBuf;
 use url::Url;
 use base64::{Engine as _, engine::general_purpose};
+use crate::services::accounts::AccountManager;
+use crate::models::AccountInfo;
 
 // ===== SECURITY HELPERS =====
 
@@ -249,6 +251,128 @@ pub async fn microsoft_login() -> Result<AuthResponse, String> {
         .authenticate()
         .await
         .map_err(|e| format!("Authentication failed: {}", e))
+}
+
+// ===== MULTI-ACCOUNT COMMANDS =====
+
+/// Get all stored accounts
+#[tauri::command]
+pub async fn get_accounts() -> Result<Vec<AccountInfo>, String> {
+    AccountManager::get_all_accounts()
+        .map_err(|e| format!("Failed to get accounts: {}", e))
+}
+
+/// Get the currently active account
+#[tauri::command]
+pub async fn get_active_account() -> Result<Option<AccountInfo>, String> {
+    let active = AccountManager::get_active_account()
+        .map_err(|e| format!("Failed to get active account: {}", e))?;
+    
+    if let Some(account) = active {
+        Ok(Some(AccountInfo {
+            uuid: account.uuid,
+            username: account.username,
+            is_active: true,
+            added_at: account.added_at,
+            last_used: account.last_used,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Switch to a different account
+#[tauri::command]
+pub async fn switch_account(uuid: String) -> Result<String, String> {
+    // Validate UUID format
+    if !uuid.chars().all(|c| c.is_alphanumeric() || c == '-') || uuid.len() > 36 {
+        return Err("Invalid UUID format".to_string());
+    }
+    
+    AccountManager::set_active_account(&uuid)
+        .map_err(|e| format!("Failed to switch account: {}", e))?;
+    
+    Ok(format!("Switched to account {}", uuid))
+}
+
+/// Remove an account
+#[tauri::command]
+pub async fn remove_account(uuid: String) -> Result<String, String> {
+    // Validate UUID format
+    if !uuid.chars().all(|c| c.is_alphanumeric() || c == '-') || uuid.len() > 36 {
+        return Err("Invalid UUID format".to_string());
+    }
+    
+    AccountManager::remove_account(&uuid)
+        .map_err(|e| format!("Failed to remove account: {}", e))?;
+    
+    Ok(format!("Account {} removed", uuid))
+}
+
+/// Login with Microsoft
+#[tauri::command]
+pub async fn microsoft_login_and_store() -> Result<AccountInfo, String> {
+    let authenticator = crate::auth::Authenticator::new()
+        .map_err(|e| format!("Failed to initialize authenticator: {}", e))?;
+    
+    let auth_response = authenticator
+        .authenticate()
+        .await
+        .map_err(|e| format!("Authentication failed: {}", e))?;
+    
+    // Check if account already exists
+    let account_exists = AccountManager::account_exists(&auth_response.uuid)
+        .map_err(|e| format!("Failed to check account: {}", e))?;
+    
+    if account_exists {
+        // Just switch to this account and update last used
+        AccountManager::set_active_account(&auth_response.uuid)
+            .map_err(|e| format!("Failed to switch account: {}", e))?;
+    } else {
+        // Add new account
+        AccountManager::add_account(
+            auth_response.uuid.clone(),
+            auth_response.username.clone(),
+            auth_response.access_token.clone(),
+        )
+        .map_err(|e| format!("Failed to store account: {}", e))?;
+    }
+    
+    // Get the account info to return
+    let accounts = AccountManager::get_all_accounts()
+        .map_err(|e| format!("Failed to get accounts: {}", e))?;
+    
+    accounts
+        .into_iter()
+        .find(|acc| acc.uuid == auth_response.uuid)
+        .ok_or_else(|| "Failed to retrieve account info".to_string())
+}
+
+/// Launch instance with the active account
+#[tauri::command]
+pub async fn launch_instance_with_active_account(
+    instance_name: String,
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    // Sanitize instance name
+    let safe_name = sanitize_instance_name(&instance_name)?;
+    
+    // Get active account
+    let active_account = AccountManager::get_active_account()
+        .map_err(|e| format!("Failed to get active account: {}", e))?
+        .ok_or_else(|| "No active account. Please sign in first.".to_string())?;
+    
+    // Launch with the active account credentials
+    crate::services::instance::InstanceManager::launch(
+        &safe_name,
+        &active_account.username,
+        &active_account.uuid,
+        &active_account.access_token,
+        app_handle,
+    )
+    .map_err(|e| format!("Failed to launch instance: {}", e))?;
+
+    Ok(format!("Launched instance '{}' with account {}", safe_name, active_account.username))
 }
 
 // ===== MINECRAFT VERSION COMMANDS =====

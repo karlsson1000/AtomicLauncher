@@ -13,12 +13,22 @@ import { CreateInstanceModal } from "./modals/CreateInstanceModal"
 import { CreationProgressToast } from "./modals/CreationProgressToast"
 import { InstanceDetailsTab } from "./modals/InstanceDetailsTab"
 import { ConfirmModal, AlertModal } from "./modals/ConfirmModal"
-import type { AuthData, Instance, LauncherSettings, ConsoleLog } from "../types"
+import type { Instance, LauncherSettings, ConsoleLog } from "../types"
+
+interface AccountInfo {
+  uuid: string
+  username: string
+  is_active: boolean
+  added_at: string
+  last_used: string | null
+}
 
 function App() {
   const [isReady, setIsReady] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [authData, setAuthData] = useState<AuthData | null>(null)
+  const [activeAccount, setActiveAccount] = useState<AccountInfo | null>(null)
+  const [accounts, setAccounts] = useState<AccountInfo[]>([])
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false)
   const [isLaunching, setIsLaunching] = useState(false)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -78,6 +88,20 @@ function App() {
     return 'Just now'
   }
 
+  const formatLastUsed = (timestamp: string | null): string => {
+    if (!timestamp) return 'Never'
+    
+    const seconds = Math.floor((Date.now() - new Date(timestamp).getTime()) / 1000)
+    const minutes = Math.floor(seconds / 60)
+    const hours = Math.floor(minutes / 60)
+    const days = Math.floor(hours / 24)
+
+    if (days > 0) return `${days}d ago`
+    if (hours > 0) return `${hours}h ago`
+    if (minutes > 0) return `${minutes}m ago`
+    return 'Just now'
+  }
+
   // Initialize app and handle splashscreen
   useEffect(() => {
     const initializeApp = async () => {
@@ -94,6 +118,7 @@ function App() {
     loadInstances()
     loadLauncherDirectory()
     loadSettings()
+    loadAccounts()
     const unlisten = listen<ConsoleLog>("console-log", (event) => {
       setConsoleLogs((prev) => [...prev, event.payload])
     })
@@ -171,12 +196,25 @@ function App() {
     }
   }
 
-  const handleLogin = async () => {
-    setIsLoggingIn(true)
+  const loadAccounts = async () => {
     try {
-      const response = await invoke<AuthData>("microsoft_login")
-      setAuthData(response)
-      setIsAuthenticated(true)
+      const accountList = await invoke<AccountInfo[]>("get_accounts")
+      setAccounts(accountList)
+      
+      const active = accountList.find(acc => acc.is_active)
+      setActiveAccount(active || null)
+      setIsAuthenticated(!!active)
+    } catch (error) {
+      console.error("Failed to load accounts:", error)
+    }
+  }
+
+  const handleAddAccount = async () => {
+    setIsLoggingIn(true)
+    setShowAccountDropdown(false)
+    try {
+      await invoke<AccountInfo>("microsoft_login_and_store")
+      await loadAccounts()
     } catch (error) {
       console.error("Login error:", error)
     } finally {
@@ -184,22 +222,35 @@ function App() {
     }
   }
 
-  const handleLogout = () => {
-    setIsAuthenticated(false)
-    setAuthData(null)
+  const handleSwitchAccount = async (uuid: string) => {
+    try {
+      await invoke("switch_account", { uuid })
+      await loadAccounts()
+      setShowAccountDropdown(false)
+    } catch (error) {
+      console.error("Failed to switch account:", error)
+    }
+  }
+
+  const handleRemoveAccount = async (uuid: string) => {
+    try {
+      await invoke("remove_account", { uuid })
+      await loadAccounts()
+      setShowAccountDropdown(false)
+    } catch (error) {
+      console.error("Failed to remove account:", error)
+    }
   }
 
   const handleLaunch = async () => {
-    if (!authData || !selectedInstance) return
+    if (!activeAccount || !selectedInstance) return
     setIsLaunching(true)
     setConsoleLogs([])
     setActiveTab("console")
     try {
-      await invoke<string>("launch_instance", {
+      await invoke<string>("launch_instance_with_active_account", {
         instanceName: selectedInstance.name,
-        username: authData.username,
-        uuid: authData.uuid,
-        accessToken: authData.access_token,
+        appHandle: appWindow,
       })
       await loadInstances()
       setTimeout(() => {
@@ -305,7 +356,7 @@ function App() {
   }
 
   const handleQuickLaunch = async (instance: Instance) => {
-    if (!authData) return
+    if (!activeAccount) return
     
     setSelectedInstance(instance)
     setIsLaunching(true)
@@ -313,11 +364,9 @@ function App() {
     setActiveTab("console")
     
     try {
-      await invoke<string>("launch_instance", {
+      await invoke<string>("launch_instance_with_active_account", {
         instanceName: instance.name,
-        username: authData.username,
-        uuid: authData.uuid,
-        accessToken: authData.access_token,
+        appHandle: appWindow,
       })
       await loadInstances()
       setTimeout(() => {
@@ -580,42 +629,132 @@ function App() {
 
           {/* Bottom Section */}
           <div className="p-2 space-y-1 border-t border-[#2a2a2a]">
-            {isAuthenticated && authData ? (
+            {isAuthenticated && activeAccount ? (
               <>
-                <div className="py-1 mb-0">
-                <div className="flex items-center gap-2.5 p-2 cursor-pointer hover:bg-[#1f1f1f] rounded-md transition-colors">
-                  <div className="relative">
-                    <img
-                      src={`https://cravatar.eu/avatar/${authData.username}/32`}
-                      alt={authData.username}
-                      className="w-8 h-8 rounded-md"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs text-[#808080]">Welcome back,</div>
-                    <div className="text-base font-medium text-[#e8e8e8] truncate">{authData.username}</div>
-                  </div>
-                  <div className="flex flex-col text-[#808080]">
-                    <ChevronUp size={14} strokeWidth={2.5} />
-                    <ChevronDown size={14} strokeWidth={2.5} />
-                  </div>
+                {/* Account Dropdown Container */}
+                <div className="relative py-1 mb-0.5">
+                  <button
+                    onClick={() => setShowAccountDropdown(!showAccountDropdown)}
+                    className="w-full flex items-center gap-2.5 p-2 cursor-pointer hover:bg-[#1f1f1f] rounded-md transition-colors"
+                  >
+                    <div className="relative">
+                      <img
+                        src={`https://cravatar.eu/avatar/${activeAccount.username}/32`}
+                        alt={activeAccount.username}
+                        className="w-8 h-8 rounded-md"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="text-xs text-[#808080]">Welcome back,</div>
+                      <div className="text-sm font-medium text-[#e8e8e8] truncate">{activeAccount.username}</div>
+                    </div>
+                    <div className="flex flex-col text-[#808080]">
+                      <ChevronUp size={14} strokeWidth={2.5} />
+                      <ChevronDown size={14} strokeWidth={2.5} />
+                    </div>
+                  </button>
+
+                  {/* Account Dropdown Menu */}
+                  {showAccountDropdown && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-40"
+                        onClick={() => setShowAccountDropdown(false)}
+                      />
+                      
+                      {/* Dropdown */}
+                      <div className="absolute bottom-1 left-0 right-0 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl z-50 overflow-hidden">
+                        {/* Add Account Button */}
+                        <button
+                          onClick={handleAddAccount}
+                          disabled={isLoggingIn}
+                          className="w-full flex items-center gap-2 p-2 text-sm text-[#e8e8e8] hover:bg-[#1f1f1f] rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <LogIn size={18} className="text-[#16a34a]" />
+                          <span>{isLoggingIn ? 'Authenticating...' : 'Add another account'}</span>
+                        </button>
+
+                        {/* Other Accounts List */}
+                        {accounts.filter(acc => !acc.is_active).length > 0 && (
+                          <>
+                            <div className="border-t border-[#2a2a2a]" />
+                            <div className="max-h-60 overflow-y-auto">
+                              {accounts
+                                .filter(acc => !acc.is_active)
+                                .map((account) => (
+                                  <div
+                                    key={account.uuid}
+                                    className="flex items-center gap-2 p-2.5 hover:bg-[#2a2a2a] transition-colors group"
+                                  >
+                                    <button
+                                      onClick={() => handleSwitchAccount(account.uuid)}
+                                      className="flex-1 flex items-center gap-2.5 cursor-pointer"
+                                    >
+                                      <img
+                                        src={`https://cravatar.eu/avatar/${account.username}/32`}
+                                        alt={account.username}
+                                        className="w-8 h-8 rounded-md"
+                                      />
+                                      <div className="flex-1 min-w-0 text-left">
+                                        <div className="text-sm font-medium text-[#e8e8e8] truncate">
+                                          {account.username}
+                                        </div>
+                                        <div className="text-xs text-[#808080]">
+                                          Last used: {formatLastUsed(account.last_used)}
+                                        </div>
+                                      </div>
+                                    </button>
+                                    
+                                    {/* Remove Account Button */}
+                                    <button
+                                      onClick={() => handleRemoveAccount(account.uuid)}
+                                      className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/10 rounded transition-all cursor-pointer"
+                                    >
+                                      <LogOut size={16} className="text-red-400" />
+                                    </button>
+                                  </div>
+                                ))}
+                            </div>
+                          </>
+                        )}
+
+                        {/* Divider */}
+                        <div className="border-t border-[#2a2a2a]" />
+
+                        {/* Current Active Account */}
+                        <div className="flex items-center gap-2.5 p-2 bg-[#2a2a2a] group">
+                          <div className="flex-1 flex items-center gap-2.5">
+                            <img
+                              src={`https://cravatar.eu/avatar/${activeAccount.username}/32`}
+                              alt={activeAccount.username}
+                              className="w-8 h-8 rounded-md"
+                            />
+                            <div className="flex-1 min-w-0 text-left">
+                              <div className="text-xs text-[#808080]">Welcome back,</div>
+                              <div className="text-sm font-medium text-[#e8e8e8] truncate">{activeAccount.username}</div>
+                            </div>
+                          </div>
+                          
+                          {/* Logout Current Account Button */}
+                          <button
+                            onClick={() => handleRemoveAccount(activeAccount.uuid)}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/10 rounded transition-all cursor-pointer"
+                          >
+                            <LogOut size={16} className="text-red-400" />
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-              </div>
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 rounded-md text-base font-medium text-[#808080] hover:text-[#e8e8e8] hover:bg-[#1f1f1f] transition-all cursor-pointer"
-                >
-                  <LogOut size={18} strokeWidth={2} />
-                  <span>Sign Out</span>
-                </button>
               </>
             ) : (
               <button
-                onClick={handleLogin}
+                onClick={handleAddAccount}
                 disabled={isLoggingIn}
-                className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white text-base py-2.5 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed mb-2"
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-md text-base font-medium transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mb-2 text-[#808080] hover:text-[#e8e8e8] hover:bg-[#1f1f1f]"
               >
-                <LogIn size={18} />
+                <LogIn size={20} className="text-[#16a34a]" strokeWidth={2} />
                 <span>{isLoggingIn ? 'Authenticating...' : 'Sign In'}</span>
               </button>
             )}

@@ -29,6 +29,14 @@ pub fn run() {
             // Authentication
             microsoft_login,
             
+            // Multi-Account Authentication
+            microsoft_login_and_store,
+            get_accounts,
+            get_active_account,
+            switch_account,
+            remove_account,
+            launch_instance_with_active_account,
+            
             // Minecraft versions
             get_minecraft_versions,
             install_minecraft,
