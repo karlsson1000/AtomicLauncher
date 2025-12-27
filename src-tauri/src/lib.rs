@@ -84,6 +84,11 @@ pub fn run() {
             open_mods_folder,
             toggle_mod,
 
+            // Modpacks
+            get_modpack_versions,
+            install_modpack,
+            get_modpack_manifest,
+
             // Servers
             get_servers,
             add_server,

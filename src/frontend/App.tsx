@@ -804,6 +804,7 @@ function App() {
                   onShowDetails={handleShowDetails}
                   onOpenFolderByInstance={handleOpenInstanceFolderByInstance}
                   onDuplicateInstance={handleDuplicateInstance}
+                  onRefreshInstances={loadInstances}
                 />
               )}
 
