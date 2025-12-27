@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useMemo } from "react"
+import { createPortal } from "react-dom"
 
 interface ContextMenuItem {
   label?: string
@@ -63,7 +64,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     }
   }, [x, y])
 
-  return (
+  const menuContent = useMemo(() => (
     <div
       ref={menuRef}
       className="fixed z-[100] bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg overflow-hidden min-w-[180px]"
@@ -93,5 +94,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
         )
       ))}
     </div>
-  )
+  ), [x, y, items, onClose])
+
+  return createPortal(menuContent, document.body)
 }
