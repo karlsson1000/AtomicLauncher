@@ -2,13 +2,14 @@ import { useState, useEffect } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
-import { LogOut, Settings, LogIn, Home, Package, Search, Terminal, Minus, Square, X, Server, Play, ChevronUp, ChevronDown } from "lucide-react"
+import { LogOut, Settings, LogIn, Home, Package, Puzzle, Terminal, Minus, Square, X, Server, Play, ChevronUp, ChevronDown, HatGlasses } from "lucide-react"
 import { HomeTab } from "./tabs/HomeTab"
 import { InstancesTab } from "./tabs/InstancesTab"
-import { ModsTab } from "./tabs/ModsTab"
+import { BrowseTab } from "./tabs/BrowseTab"
 import { ConsoleTab } from "./tabs/ConsoleTab"
 import { SettingsTab } from "./tabs/SettingsTab"
 import { ServersTab } from "./tabs/ServersTab"
+import { SkinsTab } from "./tabs/SkinsTab"
 import { CreateInstanceModal } from "./modals/CreateInstanceModal"
 import { CreationProgressToast } from "./modals/CreationProgressToast"
 import { InstanceDetailsTab } from "./modals/InstanceDetailsTab"
@@ -37,7 +38,7 @@ function App() {
   const [selectedInstance, setSelectedInstance] = useState<Instance | null>(null)
   const [launcherDirectory, setLauncherDirectory] = useState("")
   const [settings, setSettings] = useState<LauncherSettings | null>(null)
-  const [activeTab, setActiveTab] = useState<"home" | "instances" | "browse" | "console" | "settings" | "servers">("home")
+  const [activeTab, setActiveTab] = useState<"home" | "instances" | "browse" | "console" | "settings" | "servers" | "skins">("home")
   const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([])
   const [showInstanceDetails, setShowInstanceDetails] = useState(false)
   const [creatingInstanceName, setCreatingInstanceName] = useState<string | null>(null)
@@ -514,7 +515,7 @@ function App() {
                     : "text-[#808080] hover:text-[#e8e8e8] hover:bg-[#1f1f1f]"
                 }`}
               >
-                <Search size={19} strokeWidth={2} />
+                <Puzzle size={19} strokeWidth={2} />
                 <span>Mods</span>
               </button>
               <button
@@ -530,6 +531,20 @@ function App() {
               >
                 <Server size={19} strokeWidth={2} />
                 <span>Servers</span>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab("skins")
+                  setShowInstanceDetails(false)
+                }}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-md text-[15px] font-medium transition-all cursor-pointer ${
+                  activeTab === "skins"
+                    ? "bg-[#2a2a2a] text-[#e8e8e8] shadow-sm"
+                    : "text-[#808080] hover:text-[#e8e8e8] hover:bg-[#1f1f1f]"
+                }`}
+              >
+                <HatGlasses size={19} strokeWidth={2} />
+                <span>Skins</span>
               </button>
               <button
                 onClick={() => {
@@ -802,15 +817,24 @@ function App() {
               )}
 
               {activeTab === "browse" && (
-                <ModsTab
+                <BrowseTab
                   selectedInstance={selectedInstance}
                   instances={instances}
                   onSetSelectedInstance={setSelectedInstance}
+                  onRefreshInstances={loadInstances}
                 />
               )}
 
               {activeTab === "servers" && (
                 <ServersTab />
+              )}
+
+              {activeTab === "skins" && (
+                <SkinsTab
+                  activeAccount={activeAccount}
+                  isAuthenticated={isAuthenticated}
+                  invoke={invoke}
+                />
               )}
 
               {activeTab === "console" && (
