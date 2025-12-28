@@ -4,7 +4,90 @@ mod services;
 mod utils;
 mod models;
 
-use commands::*;
+use commands::{
+    // Auth commands
+    microsoft_login,
+    microsoft_login_and_store,
+    get_accounts,
+    get_active_account,
+    switch_account,
+    remove_account,
+    
+    // Instance commands
+    create_instance,
+    get_instances,
+    delete_instance,
+    rename_instance,
+    duplicate_instance,
+    launch_instance,
+    launch_instance_with_active_account,
+    set_instance_icon,
+    remove_instance_icon,
+    get_instance_icon,
+    get_launcher_directory,
+    open_instance_folder,
+    
+    // Version commands
+    get_minecraft_versions,
+    get_minecraft_versions_with_metadata,
+    get_minecraft_versions_by_type,
+    install_minecraft,
+    check_version_installed,
+    get_fabric_versions,
+    install_fabric,
+    
+    // Mod commands
+    get_installed_mods,
+    delete_mod,
+    open_mods_folder,
+    toggle_mod,
+    search_mods,
+    get_mod_details,
+    get_mod_versions,
+    download_mod,
+    get_project_details,
+    
+    // Modpack commands
+    get_modpack_versions,
+    install_modpack,
+    get_modpack_manifest,
+    get_modpack_game_versions,
+    
+    // Server commands
+    get_servers,
+    add_server,
+    delete_server,
+    update_server_status,
+    
+    // Settings commands
+    get_settings,
+    save_settings,
+    get_instance_settings,
+    save_instance_settings,
+    detect_java_installations,
+    
+    // Template commands
+    create_template,
+    get_templates,
+    get_template,
+    update_template,
+    delete_template,
+    create_template_from_instance,
+    apply_template_to_instance,
+    create_instance_from_template,
+    
+    // Skin commands
+    upload_skin,
+    reset_skin,
+    get_current_skin,
+    
+    // System commands
+    get_system_info,
+    generate_debug_report,
+    save_debug_report,
+    open_url,
+};
+
 use tauri::{AppHandle, Manager};
 
 #[tauri::command]
@@ -28,8 +111,6 @@ pub fn run() {
             
             // Authentication
             microsoft_login,
-            
-            // Multi-Account Authentication
             microsoft_login_and_store,
             get_accounts,
             get_active_account,

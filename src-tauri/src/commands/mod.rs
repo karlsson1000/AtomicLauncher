@@ -1,3 +1,20 @@
-mod commands;
-pub use commands::*;
-pub use open;
+pub mod validation;
+pub mod auth;
+pub mod instances;
+pub mod versions;
+pub mod mods;
+pub mod modpacks;
+pub mod servers;
+pub mod templates;
+pub mod settings;
+pub mod skins;
+
+pub use auth::*;
+pub use instances::*;
+pub use versions::*;
+pub use mods::*;
+pub use modpacks::*;
+pub use servers::*;
+pub use templates::*;
+pub use settings::*;
+pub use skins::*;
