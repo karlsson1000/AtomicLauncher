@@ -1,4 +1,4 @@
-import { Package, Plus, FolderOpen, Copy, Trash2, Play } from "lucide-react"
+import { Package, Plus, FolderOpen, Copy, Trash2, Play, ExternalLink } from "lucide-react"
 import { useState, useEffect } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import type { Instance } from "../../types"
@@ -18,6 +18,26 @@ interface HomeTabProps {
   onRefreshInstances?: () => void
 }
 
+interface Snapshot {
+  id: string
+  title: string
+  version: string
+  type: string
+  date?: string
+  image?: {
+    title: string
+    url: string
+  }
+  body?: string
+  contentPath?: string
+  shortText?: string
+}
+
+interface SnapshotsResponse {
+  version: number
+  entries: Snapshot[]
+}
+
 export function HomeTab({
   instances,
   isAuthenticated,
@@ -35,6 +55,8 @@ export function HomeTab({
     instance: Instance
   } | null>(null)
   const [instanceIcons, setInstanceIcons] = useState<Record<string, string | null>>({})
+  const [snapshots, setSnapshots] = useState<Snapshot[]>([])
+  const [loadingSnapshots, setLoadingSnapshots] = useState(true)
 
   // Load icons for all instances
   useEffect(() => {
@@ -59,6 +81,24 @@ export function HomeTab({
     }
   }, [instances])
 
+  // Load snapshots
+  useEffect(() => {
+    const loadSnapshots = async () => {
+      try {
+        const response = await fetch('https://launchercontent.mojang.com/v2/javaPatchNotes.json')
+        const data: SnapshotsResponse = await response.json()
+        // Get the latest 4 snapshots
+        setSnapshots(data.entries.slice(0, 4))
+      } catch (error) {
+        console.error('Failed to load snapshots:', error)
+      } finally {
+        setLoadingSnapshots(false)
+      }
+    }
+
+    loadSnapshots()
+  }, [])
+
   const handleContextMenu = (e: React.MouseEvent, instance: Instance) => {
     e.preventDefault()
     setContextMenu({
@@ -76,9 +116,48 @@ export function HomeTab({
     return instance.version
   }
 
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  const cleanVersionName = (version: string): string => {
+    // Remove "Minecraft Java Edition" and "| Minecraft" from version string
+    return version
+      .replace('Minecraft Java Edition', '')
+      .replace('| Minecraft', '')
+      .replace('Minecraft:', '')
+      .replace('Minecraft', '')
+      .trim()
+  }
+
+  const getVersionUrl = (version: string): string => {
+    const cleanVersion = cleanVersionName(version)
+    
+    // Check if it's a snapshot (contains 'w' pattern like 25w46a or 'snapshot' in name)
+    const isSnapshot = /\d+w\d+[a-z]?/.test(cleanVersion) || cleanVersion.toLowerCase().includes('snapshot')
+    
+    if (isSnapshot) {
+      // For snapshots: minecraft-snapshot-25w46a or minecraft-26-1-snapshot-1
+      const urlVersion = cleanVersion.replace(/\./g, '-').toLowerCase()
+      
+      // Check if it's a weekly snapshot (like 25w46a)
+      if (/\d+w\d+[a-z]?/.test(cleanVersion)) {
+        return `https://www.minecraft.net/en-us/article/minecraft-snapshot-${urlVersion}`
+      } else {
+        // For numbered snapshots (like 26.1-snapshot-1)
+        return `https://www.minecraft.net/en-us/article/minecraft-${urlVersion}`
+      }
+    } else {
+      // For releases: minecraft-java-edition-1-21-4
+      const urlVersion = cleanVersion.replace(/\./g, '-').toLowerCase()
+      return `https://www.minecraft.net/en-us/article/minecraft-java-edition-${urlVersion}`
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -174,6 +253,81 @@ export function HomeTab({
                   </div>
                 )
               })}
+            </div>
+          )}
+        </div>
+
+        {/* Snapshots Section */}
+        <div>
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold text-[#e8e8e8] tracking-tight">Latest Snapshots</h2>
+            <p className="text-sm text-[#808080] mt-0.5">Recent Java Edition snapshots</p>
+          </div>
+
+          {loadingSnapshots ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-8 h-8 border-2 border-[#2a2a2a] border-t-[#16a34a] rounded-full animate-spin" />
+            </div>
+          ) : snapshots.length === 0 ? (
+            <div className="bg-[#1a1a1a] rounded-xl p-8 text-center">
+              <p className="text-[#808080]">Unable to load snapshots</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {snapshots.map((snapshot) => (
+                <div
+                  key={snapshot.id}
+                  onClick={async () => {
+                    try {
+                      await invoke('open_url', { url: getVersionUrl(snapshot.version) })
+                    } catch (error) {
+                      console.error('Failed to open link:', error)
+                    }
+                  }}
+                  className="bg-[#1a1a1a] rounded-lg overflow-hidden relative group cursor-pointer"
+                >
+                  {/* External Link Icon */}
+                  <div className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ExternalLink size={20} className="text-[#e8e8e8]" />
+                  </div>
+                  
+                  {/* Snapshot Image */}
+                  <div className="h-40 bg-[#141414] overflow-hidden relative">
+                    {snapshot.image?.url ? (
+                      <img
+                        src={`https://launchercontent.mojang.com${snapshot.image.url}`}
+                        alt={snapshot.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package size={48} className="text-[#4a4a4a]" strokeWidth={1.5} />
+                      </div>
+                    )}
+                    {/* Hover Overlay - Gradient from bottom */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="p-4">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h3 className="text-base font-semibold text-[#e8e8e8]">
+                        {cleanVersionName(snapshot.version)}
+                      </h3>
+                      {snapshot.date && (
+                        <span className="text-xs text-[#808080] whitespace-nowrap">
+                          {formatDate(snapshot.date)}
+                        </span>
+                      )}
+                    </div>
+                    {snapshot.shortText && (
+                      <p className="text-xs text-[#808080] line-clamp-3">
+                        {snapshot.shortText}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

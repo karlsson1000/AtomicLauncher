@@ -13,6 +13,7 @@ dependencies = [
  "dotenvy",
  "image",
  "oauth2",
+ "open",
  "reqwest 0.12.25",
  "serde",
  "serde_json",

@@ -112,6 +112,9 @@ pub fn run() {
             apply_template_to_instance,
             create_instance_from_template,
 
+            // Open links
+            open_url,
+
             // Debug
             generate_debug_report,
             save_debug_report,

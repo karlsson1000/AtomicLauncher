@@ -2518,3 +2518,8 @@ pub async fn get_current_skin() -> Result<Option<CurrentSkin>, String> {
         Ok(None)
     }
 }
+
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), String> {
+    open::that(url).map_err(|e| e.to_string())
+}
