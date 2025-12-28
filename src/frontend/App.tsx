@@ -30,7 +30,7 @@ function App() {
   const [activeAccount, setActiveAccount] = useState<AccountInfo | null>(null)
   const [accounts, setAccounts] = useState<AccountInfo[]>([])
   const [showAccountDropdown, setShowAccountDropdown] = useState(false)
-  const [isLaunching, setIsLaunching] = useState(false)
+  const [launchingInstanceName, setLaunchingInstanceName] = useState<string | null>(null)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [versions, setVersions] = useState<string[]>([])
@@ -240,24 +240,24 @@ function App() {
     }
   }
 
-  const handleLaunch = async () => {
-    if (!activeAccount || !selectedInstance) return
-    setIsLaunching(true)
+  const handleLaunch = async (instance: Instance) => {
+    if (!activeAccount) return
+    setLaunchingInstanceName(instance.name)
     setConsoleLogs([])
     setActiveTab("console")
     setShowInstanceDetails(false)
     try {
       await invoke<string>("launch_instance_with_active_account", {
-        instanceName: selectedInstance.name,
+        instanceName: instance.name,
         appHandle: appWindow,
       })
       await loadInstances()
       setTimeout(() => {
-        setIsLaunching(false)
+        setLaunchingInstanceName(null)
       }, 2000)
     } catch (error) {
       console.error("Launch error:", error)
-      setIsLaunching(false)
+      setLaunchingInstanceName(null)
     }
   }
 
@@ -357,8 +357,7 @@ function App() {
   const handleQuickLaunch = async (instance: Instance) => {
     if (!activeAccount) return
     
-    setSelectedInstance(instance)
-    setIsLaunching(true)
+    setLaunchingInstanceName(instance.name)
     setConsoleLogs([])
     setActiveTab("console")
     
@@ -369,11 +368,11 @@ function App() {
       })
       await loadInstances()
       setTimeout(() => {
-        setIsLaunching(false)
+        setLaunchingInstanceName(null)
       }, 2000)
     } catch (error) {
       console.error("Launch error:", error)
-      setIsLaunching(false)
+      setLaunchingInstanceName(null)
     }
   }
 
@@ -608,14 +607,14 @@ function App() {
                                 e.stopPropagation()
                                 handleQuickLaunch(instance)
                               }}
-                              disabled={isLaunching}
+                              disabled={launchingInstanceName !== null}
                               className={`opacity-0 group-hover:opacity-100 flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-md transition-all cursor-pointer mr-1 ${
-                                isLaunching && selectedInstance?.name === instance.name
+                                launchingInstanceName === instance.name
                                   ? "bg-red-500/10 text-red-400"
                                   : "bg-[#16a34a]/10 hover:bg-[#16a34a]/20 text-[#16a34a]"
                               } disabled:opacity-50`}
                             >
-                              {isLaunching && selectedInstance?.name === instance.name ? (
+                              {launchingInstanceName === instance.name ? (
                                 <div className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
                               ) : (
                                 <Play size={16} fill="currentColor" strokeWidth={0} />
@@ -776,8 +775,8 @@ function App() {
             <InstanceDetailsTab
               instance={selectedInstance}
               isAuthenticated={isAuthenticated}
-              isLaunching={isLaunching}
-              onLaunch={handleLaunch}
+              isLaunching={launchingInstanceName === selectedInstance.name}
+              onLaunch={() => handleLaunch(selectedInstance)}
               onBack={handleCloseDetails}
               onInstanceUpdated={loadInstances}
             />
@@ -785,11 +784,9 @@ function App() {
             <>
               {activeTab === "home" && (
                 <HomeTab
-                  selectedInstance={selectedInstance}
                   instances={instances}
                   isAuthenticated={isAuthenticated}
-                  isLaunching={isLaunching}
-                  onSetSelectedInstance={setSelectedInstance}
+                  launchingInstanceName={launchingInstanceName}
                   onLaunch={handleLaunch}
                   onOpenFolder={handleOpenInstanceFolder}
                   onDeleteInstance={handleDeleteInstance}
@@ -806,8 +803,9 @@ function App() {
                   instances={instances}
                   selectedInstance={selectedInstance}
                   isAuthenticated={isAuthenticated}
+                  launchingInstanceName={launchingInstanceName}
                   onSetSelectedInstance={setSelectedInstance}
-                  onLaunch={handleLaunch}
+                  onLaunch={() => selectedInstance && handleLaunch(selectedInstance)}
                   onCreateNew={() => setShowCreateModal(true)}
                   onShowDetails={handleShowDetails}
                   onOpenFolder={handleOpenInstanceFolderByInstance}

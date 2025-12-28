@@ -1,16 +1,14 @@
-import { Package, Plus, FolderOpen, Copy, Trash2 } from "lucide-react"
-import { useState, useEffect, useRef } from "react"
+import { Package, Plus, FolderOpen, Copy, Trash2, Play } from "lucide-react"
+import { useState, useEffect } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import type { Instance } from "../../types"
 import { ContextMenu } from "../modals/ContextMenu"
 
 interface HomeTabProps {
-  selectedInstance: Instance | null
   instances: Instance[]
   isAuthenticated: boolean
-  isLaunching: boolean
-  onSetSelectedInstance: (instance: Instance) => void
-  onLaunch: () => void
+  launchingInstanceName: string | null
+  onLaunch: (instance: Instance) => void | Promise<void>
   onOpenFolder: () => void
   onDeleteInstance: (name: string) => void
   onCreateNew: () => void
@@ -21,11 +19,9 @@ interface HomeTabProps {
 }
 
 export function HomeTab({
-  selectedInstance,
   instances,
   isAuthenticated,
-  isLaunching,
-  onSetSelectedInstance,
+  launchingInstanceName,
   onLaunch,
   onCreateNew,
   onShowDetails,
@@ -33,30 +29,12 @@ export function HomeTab({
   onDuplicateInstance,
   onDeleteInstance,
 }: HomeTabProps) {
-  const [showInstanceDropdown, setShowInstanceDropdown] = useState(false)
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
     instance: Instance
   } | null>(null)
   const [instanceIcons, setInstanceIcons] = useState<Record<string, string | null>>({})
-  const dropdownRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowInstanceDropdown(false)
-      }
-    }
-
-    if (showInstanceDropdown) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showInstanceDropdown])
 
   // Load icons for all instances
   useEffect(() => {
@@ -105,7 +83,7 @@ export function HomeTab({
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-semibold text-[#e8e8e8] tracking-tight">Home</h1>
-            <p className="text-sm text-[#808080] mt-0.5">Your Minecraft instances</p>
+            <p className="text-sm text-[#808080] mt-0.5">Recently played instances</p>
           </div>
           <button
             onClick={onCreateNew}
@@ -135,43 +113,63 @@ export function HomeTab({
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {instances.map((instance) => {
                 const icon = instanceIcons[instance.name]
+                const isLaunching = launchingInstanceName === instance.name
                 return (
                   <div
                     key={instance.name}
-                    onClick={() => {
-                      onSetSelectedInstance(instance)
-                    }}
+                    onClick={() => onShowDetails(instance)}
                     onContextMenu={(e) => handleContextMenu(e, instance)}
-                    className={`group relative aspect-[3/4] bg-[#1a1a1a] rounded-xl overflow-hidden cursor-pointer transition-all ${
-                      selectedInstance?.name === instance.name
-                        ? instance.loader === "fabric"
-                          ? "ring-2 ring-[#3b82f6]"
-                          : "ring-2 ring-[#16a34a]"
-                        : "hover:ring-2 hover:ring-[#2a2a2a]"
-                    }`}
+                    className="group relative bg-[#1a1a1a] rounded-xl overflow-hidden cursor-pointer transition-all hover:ring-2 hover:ring-[#2a2a2a]"
                   >
-                    {icon ? (
-                      <img
-                        src={icon}
-                        alt={instance.name}
-                        className="absolute inset-0 w-full h-full object-contain p-4"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
+                    {/* Square Image Section */}
+                    <div className="aspect-square bg-[#141414] flex items-center justify-center overflow-hidden">
+                      {icon ? (
+                        <img
+                          src={icon}
+                          alt={instance.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
                         <Package size={88} className="text-[#4a4a4a]" strokeWidth={1.5} />
+                      )}
+                    </div>
+                    
+                    {/* Solid Text Section with Play Button */}
+                    <div className="bg-[#1a1a1a] p-3 flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-semibold text-[#e8e8e8] truncate mb-0.5">{instance.name}</h3>
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span className="text-[#808080]">{getMinecraftVersion(instance)}</span>
+                          <span className="text-[#4a4a4a]">•</span>
+                          {instance.loader === "fabric" ? (
+                            <span className="text-[#3b82f6]">Fabric</span>
+                          ) : (
+                            <span className="text-[#16a34a]">Vanilla</span>
+                          )}
+                        </div>
                       </div>
-                    )}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-3">
-                      <h3 className="text-sm font-semibold text-[#e8e8e8] truncate mb-0.5">{instance.name}</h3>
-                      <div className="flex items-center gap-1.5 text-xs">
-                        <span className="text-[#808080]">{getMinecraftVersion(instance)}</span>
-                        <span className="text-[#4a4a4a]">•</span>
-                        {instance.loader === "fabric" ? (
-                          <span className="text-[#3b82f6]">Fabric</span>
-                        ) : (
-                          <span className="text-[#16a34a]">Vanilla</span>
-                        )}
-                      </div>
+                      
+                      {/* Play Button */}
+                      {isAuthenticated && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onLaunch(instance)
+                          }}
+                          disabled={launchingInstanceName !== null}
+                          className={`opacity-0 group-hover:opacity-100 flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-md transition-all cursor-pointer ${
+                            isLaunching
+                              ? "bg-red-500/10 text-red-400"
+                              : "bg-[#16a34a]/10 hover:bg-[#16a34a]/20 text-[#16a34a]"
+                          } disabled:opacity-50`}
+                        >
+                          {isLaunching ? (
+                            <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                          ) : (
+                            <Play size={18} fill="currentColor" strokeWidth={0} />
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 )
@@ -192,7 +190,6 @@ export function HomeTab({
               label: "Open",
               icon: <Package size={16} />,
               onClick: () => {
-                onSetSelectedInstance(contextMenu.instance)
                 onShowDetails(contextMenu.instance)
               },
             },

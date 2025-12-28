@@ -1,4 +1,4 @@
-import { Package, Plus, Search, FolderOpen, Copy, Trash2, FileText, Download, ChevronDown } from "lucide-react"
+import { Package, Plus, Search, FolderOpen, Copy, Trash2, FileText, Download, ChevronDown, Play } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { createPortal } from "react-dom"
 import { invoke } from "@tauri-apps/api/core"
@@ -45,6 +45,7 @@ interface InstancesTabProps {
   instances: Instance[]
   selectedInstance: Instance | null
   isAuthenticated: boolean
+  launchingInstanceName: string | null
   onSetSelectedInstance: (instance: Instance) => void
   onLaunch: () => void
   onCreateNew: () => void
@@ -56,8 +57,11 @@ interface InstancesTabProps {
 
 export function InstancesTab({
   instances,
+  isAuthenticated,
+  launchingInstanceName,
   onCreateNew,
   onSetSelectedInstance,
+  onLaunch,
   onShowDetails,
   onOpenFolder,
   onDuplicateInstance,
@@ -99,6 +103,11 @@ export function InstancesTab({
       return parts[parts.length - 1]
     }
     return instance.version
+  }
+
+  const handleQuickLaunch = (instance: Instance) => {
+    onSetSelectedInstance(instance)
+    onLaunch()
   }
 
   // Load icons for all instances
@@ -319,6 +328,7 @@ export function InstancesTab({
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
               {filteredInstances.map((instance) => {
                 const icon = instanceIcons[instance.name]
+                const isLaunching = launchingInstanceName === instance.name
                 return (
                   <div
                     key={instance.name}
@@ -327,34 +337,57 @@ export function InstancesTab({
                       onShowDetails(instance)
                     }}
                     onContextMenu={(e) => handleContextMenu(e, instance)}
-                    className={`group relative aspect-[3/4] bg-[#1a1a1a] rounded-xl overflow-hidden cursor-pointer transition-all ${
-                      instance.loader === "fabric"
-                        ? "hover:ring-2 hover:ring-[#3b82f6]"
-                        : "hover:ring-2 hover:ring-[#16a34a]"
-                    }`}
+                    className="group relative bg-[#1a1a1a] rounded-xl overflow-hidden cursor-pointer transition-all hover:ring-2 hover:ring-[#2a2a2a]"
                   >
-                    {icon ? (
-                      <img
-                        src={icon}
-                        alt={instance.name}
-                        className="absolute inset-0 w-full h-full object-contain p-4"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Package size={64} className="text-[#4a4a4a]" strokeWidth={1.5} />
+                    {/* Square Image Section */}
+                    <div className="aspect-square bg-[#141414] flex items-center justify-center overflow-hidden">
+                      {icon ? (
+                        <img
+                          src={icon}
+                          alt={instance.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Package size={88} className="text-[#4a4a4a]" strokeWidth={1.5} />
+                      )}
+                    </div>
+                    
+                    {/* Solid Text Section with Play Button */}
+                    <div className="bg-[#1a1a1a] p-3 flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-semibold text-[#e8e8e8] truncate mb-0.5">{instance.name}</h3>
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span className="text-[#808080]">{getMinecraftVersion(instance)}</span>
+                          <span className="text-[#4a4a4a]">•</span>
+                          {instance.loader === "fabric" ? (
+                            <span className="text-[#3b82f6]">Fabric</span>
+                          ) : (
+                            <span className="text-[#16a34a]">Vanilla</span>
+                          )}
+                        </div>
                       </div>
-                    )}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-3">
-                      <h3 className="text-sm font-semibold text-[#e8e8e8] truncate mb-0.5">{instance.name}</h3>
-                      <div className="flex items-center gap-1.5 text-xs">
-                        <span className="text-[#808080]">{getMinecraftVersion(instance)}</span>
-                        <span className="text-[#4a4a4a]">•</span>
-                        {instance.loader === "fabric" ? (
-                          <span className="text-[#3b82f6]">Fabric</span>
-                        ) : (
-                          <span className="text-[#16a34a]">Vanilla</span>
-                        )}
-                      </div>
+                      
+                      {/* Play Button */}
+                      {isAuthenticated && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleQuickLaunch(instance)
+                          }}
+                          disabled={launchingInstanceName !== null}
+                          className={`opacity-0 group-hover:opacity-100 flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-md transition-all cursor-pointer ${
+                            isLaunching
+                              ? "bg-red-500/10 text-red-400"
+                              : "bg-[#16a34a]/10 hover:bg-[#16a34a]/20 text-[#16a34a]"
+                          } disabled:opacity-50`}
+                        >
+                          {isLaunching ? (
+                            <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                          ) : (
+                            <Play size={18} fill="currentColor" strokeWidth={0} />
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 )

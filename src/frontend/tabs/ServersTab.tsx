@@ -276,11 +276,7 @@ export function ServersTab({}: ServersTabProps) {
                 <div
                   key={server.name}
                   onClick={() => setSelectedServer(server)}
-                  className={`bg-[#1a1a1a] rounded-xl p-4 cursor-pointer transition-all ${
-                    selectedServer?.name === server.name 
-                      ? "ring-2 ring-[#16a34a]" 
-                      : "hover:ring-2 hover:ring-[#16a34a]"
-                  }`}
+                  className="bg-[#1a1a1a] rounded-xl p-4 cursor-pointer transition-all hover:ring-2 hover:ring-[#2a2a2a]"
                 >
                   <div className="flex gap-3 mb-2">
                     {server.favicon ? (
