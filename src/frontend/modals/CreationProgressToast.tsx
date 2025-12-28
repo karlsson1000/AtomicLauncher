@@ -126,7 +126,7 @@ export function CreationProgressToast({ instanceName, onComplete, onDismiss }: C
   }
 
   return (
-    <div className="fixed top-14 right-4 z-40 w-80 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl overflow-hidden animate-in slide-in-from-right-4 duration-300">
+    <div className="fixed top-14 right-4 z-40 w-80 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg overflow-hidden animate-in slide-in-from-right-4 duration-300">
       <div className="p-4">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
