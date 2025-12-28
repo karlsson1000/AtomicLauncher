@@ -144,36 +144,6 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
     (loaderType === "fabric" && !selectedFabricVersion) ||
     isLoadingVersions
 
-  const getVersionTypeColor = (type: string) => {
-    switch (type) {
-      case "release":
-        return "text-[#16a34a]"
-      case "snapshot":
-        return "text-[#eab308]"
-      case "old_beta":
-        return "text-[#3b82f6]"
-      case "old_alpha":
-        return "text-[#8b5cf6]"
-      default:
-        return "text-[#808080]"
-    }
-  }
-
-  const getVersionTypeBadge = (type: string) => {
-    switch (type) {
-      case "release":
-        return null // Don't show badge for releases
-      case "snapshot":
-        return "S"
-      case "old_beta":
-        return "β"
-      case "old_alpha":
-        return "α"
-      default:
-        return null
-    }
-  }
-
   return (
     <>
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
