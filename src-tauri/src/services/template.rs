@@ -23,7 +23,6 @@ impl TemplateManager {
         let templates_dir = Self::get_templates_dir();
         fs::create_dir_all(&templates_dir)?;
 
-        // Generate a simple unique ID using timestamp and random component
         let timestamp = Utc::now().timestamp_millis();
         let random_part: u32 = (timestamp % 10000) as u32;
         let template_id = format!("{}-{}", timestamp, random_part);
@@ -117,12 +116,10 @@ impl TemplateManager {
             return Err(format!("Instance '{}' not found", instance_name).into());
         }
 
-        // Load instance metadata
         let instance_json = instance_dir.join("instance.json");
         let instance: crate::models::Instance =
             serde_json::from_str(&fs::read_to_string(&instance_json)?)?;
 
-        // Read options.txt for Minecraft settings
         let options_path = instance_dir.join("options.txt");
         let minecraft_options = if options_path.exists() {
             Some(Self::parse_options_txt(&options_path)?)
@@ -143,6 +140,7 @@ impl TemplateManager {
         let mut options = MinecraftOptions {
             fov: None,
             render_distance: None,
+            simulation_distance: None,
             max_fps: None,
             fullscreen: None,
             vsync: None,
@@ -151,10 +149,16 @@ impl TemplateManager {
             entity_shadows: None,
             particles: None,
             graphics: None,
+            graphics_preset: None,
             smooth_lighting: None,
             biome_blend: None,
+            mipmap_levels: None,
+            chunk_updates_mode: None,
+            cloud_rendering: None,
+            vignette: None,
             master_volume: None,
             music_volume: None,
+            record_volume: None,
             weather_volume: None,
             blocks_volume: None,
             hostile_volume: None,
@@ -168,26 +172,48 @@ impl TemplateManager {
             sneak_toggles: None,
             sprint_toggles: None,
             raw_input: None,
+            discrete_mouse_scroll: None,
+            touchscreen: None,
+            narrator: None,
+            chat_opacity: None,
+            chat_line_spacing: None,
+            text_background_opacity: None,
+            chat_height_focused: None,
+            chat_height_unfocused: None,
+            chat_width: None,
+            damage_tilt_strength: None,
             keybinds: Some(std::collections::HashMap::new()),
         };
 
         for line in content.lines() {
             if let Some((key, value)) = line.split_once(':') {
                 match key {
+                    // Video - Basic
                     "fov" => options.fov = value.parse().ok(),
                     "renderDistance" => options.render_distance = value.parse().ok(),
+                    "simulationDistance" => options.simulation_distance = value.parse().ok(),
                     "maxFps" => options.max_fps = value.parse().ok(),
                     "fullscreen" => options.fullscreen = Some(value == "true"),
                     "enableVsync" => options.vsync = Some(value == "true"),
                     "guiScale" => options.gui_scale = value.parse().ok(),
                     "gamma" => options.brightness = value.parse().ok(),
+                    
+                    // Video - Quality
                     "entityShadows" => options.entity_shadows = Some(value == "true"),
                     "particles" => options.particles = Some(value.to_string()),
                     "graphicsMode" => options.graphics = Some(value.to_string()),
-                    "ao" => options.smooth_lighting = Some(value != "0"),
+                    "graphicsPreset" => options.graphics_preset = Some(value.trim_matches('"').to_string()),
+                    "ao" => options.smooth_lighting = Some(value == "true"),
                     "biomeBlendRadius" => options.biome_blend = value.parse().ok(),
+                    "mipmapLevels" => options.mipmap_levels = value.parse().ok(),
+                    "prioritizeChunkUpdates" => options.chunk_updates_mode = value.parse().ok(),
+                    "renderClouds" => options.cloud_rendering = Some(value.trim_matches('"').to_string()),
+                    "vignette" => options.vignette = Some(value == "true"),
+                    
+                    // Audio
                     "soundCategory_master" => options.master_volume = value.parse().ok(),
                     "soundCategory_music" => options.music_volume = value.parse().ok(),
+                    "soundCategory_record" => options.record_volume = value.parse().ok(),
                     "soundCategory_weather" => options.weather_volume = value.parse().ok(),
                     "soundCategory_block" => options.blocks_volume = value.parse().ok(),
                     "soundCategory_hostile" => options.hostile_volume = value.parse().ok(),
@@ -195,12 +221,29 @@ impl TemplateManager {
                     "soundCategory_player" => options.players_volume = value.parse().ok(),
                     "soundCategory_ambient" => options.ambient_volume = value.parse().ok(),
                     "soundCategory_voice" => options.voice_volume = value.parse().ok(),
+                    
+                    // Controls - Mouse
                     "mouseSensitivity" => options.mouse_sensitivity = value.parse().ok(),
                     "invertYMouse" => options.invert_mouse = Some(value == "true"),
+                    "rawMouseInput" => options.raw_input = Some(value == "true"),
+                    "discrete_mouse_scroll" => options.discrete_mouse_scroll = Some(value == "true"),
+                    "touchscreen" => options.touchscreen = Some(value == "true"),
+                    
+                    // Controls - Movement
                     "autoJump" => options.auto_jump = Some(value == "true"),
                     "toggleCrouch" => options.sneak_toggles = Some(value == "true"),
                     "toggleSprint" => options.sprint_toggles = Some(value == "true"),
-                    "rawMouseInput" => options.raw_input = Some(value == "true"),
+                    
+                    // Chat & Accessibility
+                    "narrator" => options.narrator = value.parse().ok(),
+                    "chatOpacity" => options.chat_opacity = value.parse().ok(),
+                    "chatLineSpacing" => options.chat_line_spacing = value.parse().ok(),
+                    "textBackgroundOpacity" => options.text_background_opacity = value.parse().ok(),
+                    "chatHeightFocused" => options.chat_height_focused = value.parse().ok(),
+                    "chatHeightUnfocused" => options.chat_height_unfocused = value.parse().ok(),
+                    "chatWidth" => options.chat_width = value.parse().ok(),
+                    "damageTiltStrength" => options.damage_tilt_strength = value.parse().ok(),
+                    
                     _ => {
                         if key.starts_with("key_") {
                             if let Some(ref mut keybinds) = options.keybinds {
@@ -228,7 +271,6 @@ impl TemplateManager {
 
         println!("Applying template '{}' to instance '{}'", template.name, instance_name);
 
-        // Apply launcher settings
         if let Some(launcher_settings) = template.launcher_settings {
             println!("  → Applying launcher settings (RAM: {}MB)", launcher_settings.memory_mb);
             let instance_json = instance_dir.join("instance.json");
@@ -242,19 +284,16 @@ impl TemplateManager {
             println!("  ✓ Launcher settings applied");
         }
 
-        // Apply Minecraft options
         if let Some(minecraft_options) = template.minecraft_options {
             println!("  → Applying game options");
             let options_path = instance_dir.join("options.txt");
             
-            // Read existing options if they exist
             let mut existing_options = if options_path.exists() {
                 fs::read_to_string(&options_path)?
             } else {
                 String::new()
             };
 
-            // Merge template options into existing options
             Self::merge_options_txt(&mut existing_options, &minecraft_options)?;
             fs::write(&options_path, existing_options)?;
             println!("  ✓ Game options applied");
@@ -270,7 +309,6 @@ impl TemplateManager {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut lines: Vec<String> = existing.lines().map(|s| s.to_string()).collect();
         
-        // Helper to update or add a line
         let update_line = |lines: &mut Vec<String>, key: &str, value: String| {
             if let Some(pos) = lines.iter().position(|l| l.starts_with(&format!("{}:", key))) {
                 lines[pos] = format!("{}:{}", key, value);
@@ -279,11 +317,15 @@ impl TemplateManager {
             }
         };
 
+        // Video - Basic
         if let Some(fov) = options.fov {
             update_line(&mut lines, "fov", fov.to_string());
         }
         if let Some(render_distance) = options.render_distance {
             update_line(&mut lines, "renderDistance", render_distance.to_string());
+        }
+        if let Some(simulation_distance) = options.simulation_distance {
+            update_line(&mut lines, "simulationDistance", simulation_distance.to_string());
         }
         if let Some(max_fps) = options.max_fps {
             update_line(&mut lines, "maxFps", max_fps.to_string());
@@ -300,6 +342,8 @@ impl TemplateManager {
         if let Some(brightness) = options.brightness {
             update_line(&mut lines, "gamma", brightness.to_string());
         }
+
+        // Video - Quality
         if let Some(entity_shadows) = options.entity_shadows {
             update_line(&mut lines, "entityShadows", entity_shadows.to_string());
         }
@@ -309,17 +353,37 @@ impl TemplateManager {
         if let Some(ref graphics) = options.graphics {
             update_line(&mut lines, "graphicsMode", graphics.clone());
         }
+        if let Some(ref graphics_preset) = options.graphics_preset {
+            update_line(&mut lines, "graphicsPreset", format!("\"{}\"", graphics_preset));
+        }
         if let Some(smooth_lighting) = options.smooth_lighting {
-            update_line(&mut lines, "ao", if smooth_lighting { "2".to_string() } else { "0".to_string() });
+            update_line(&mut lines, "ao", if smooth_lighting { "true".to_string() } else { "false".to_string() });
         }
         if let Some(biome_blend) = options.biome_blend {
             update_line(&mut lines, "biomeBlendRadius", biome_blend.to_string());
         }
+        if let Some(mipmap_levels) = options.mipmap_levels {
+            update_line(&mut lines, "mipmapLevels", mipmap_levels.to_string());
+        }
+        if let Some(chunk_updates_mode) = options.chunk_updates_mode {
+            update_line(&mut lines, "prioritizeChunkUpdates", chunk_updates_mode.to_string());
+        }
+        if let Some(ref cloud_rendering) = options.cloud_rendering {
+            update_line(&mut lines, "renderClouds", format!("\"{}\"", cloud_rendering));
+        }
+        if let Some(vignette) = options.vignette {
+            update_line(&mut lines, "vignette", vignette.to_string());
+        }
+
+        // Audio
         if let Some(master_volume) = options.master_volume {
             update_line(&mut lines, "soundCategory_master", master_volume.to_string());
         }
         if let Some(music_volume) = options.music_volume {
             update_line(&mut lines, "soundCategory_music", music_volume.to_string());
+        }
+        if let Some(record_volume) = options.record_volume {
+            update_line(&mut lines, "soundCategory_record", record_volume.to_string());
         }
         if let Some(weather_volume) = options.weather_volume {
             update_line(&mut lines, "soundCategory_weather", weather_volume.to_string());
@@ -342,12 +406,25 @@ impl TemplateManager {
         if let Some(voice_volume) = options.voice_volume {
             update_line(&mut lines, "soundCategory_voice", voice_volume.to_string());
         }
+
+        // Controls - Mouse
         if let Some(mouse_sensitivity) = options.mouse_sensitivity {
             update_line(&mut lines, "mouseSensitivity", mouse_sensitivity.to_string());
         }
         if let Some(invert_mouse) = options.invert_mouse {
             update_line(&mut lines, "invertYMouse", invert_mouse.to_string());
         }
+        if let Some(raw_input) = options.raw_input {
+            update_line(&mut lines, "rawMouseInput", raw_input.to_string());
+        }
+        if let Some(discrete_mouse_scroll) = options.discrete_mouse_scroll {
+            update_line(&mut lines, "discrete_mouse_scroll", discrete_mouse_scroll.to_string());
+        }
+        if let Some(touchscreen) = options.touchscreen {
+            update_line(&mut lines, "touchscreen", touchscreen.to_string());
+        }
+
+        // Controls - Movement
         if let Some(auto_jump) = options.auto_jump {
             update_line(&mut lines, "autoJump", auto_jump.to_string());
         }
@@ -357,10 +434,34 @@ impl TemplateManager {
         if let Some(sprint_toggles) = options.sprint_toggles {
             update_line(&mut lines, "toggleSprint", sprint_toggles.to_string());
         }
-        if let Some(raw_input) = options.raw_input {
-            update_line(&mut lines, "rawMouseInput", raw_input.to_string());
+
+        // Chat & Accessibility
+        if let Some(narrator) = options.narrator {
+            update_line(&mut lines, "narrator", narrator.to_string());
+        }
+        if let Some(chat_opacity) = options.chat_opacity {
+            update_line(&mut lines, "chatOpacity", chat_opacity.to_string());
+        }
+        if let Some(chat_line_spacing) = options.chat_line_spacing {
+            update_line(&mut lines, "chatLineSpacing", chat_line_spacing.to_string());
+        }
+        if let Some(text_background_opacity) = options.text_background_opacity {
+            update_line(&mut lines, "textBackgroundOpacity", text_background_opacity.to_string());
+        }
+        if let Some(chat_height_focused) = options.chat_height_focused {
+            update_line(&mut lines, "chatHeightFocused", chat_height_focused.to_string());
+        }
+        if let Some(chat_height_unfocused) = options.chat_height_unfocused {
+            update_line(&mut lines, "chatHeightUnfocused", chat_height_unfocused.to_string());
+        }
+        if let Some(chat_width) = options.chat_width {
+            update_line(&mut lines, "chatWidth", chat_width.to_string());
+        }
+        if let Some(damage_tilt_strength) = options.damage_tilt_strength {
+            update_line(&mut lines, "damageTiltStrength", damage_tilt_strength.to_string());
         }
 
+        // Keybinds
         if let Some(ref keybinds) = options.keybinds {
             for (key, value) in keybinds {
                 update_line(&mut lines, key, value.clone());

@@ -79,7 +79,6 @@ pub async fn create_instance_from_template(
 ) -> Result<Instance, String> {
     let template = TemplateManager::get_template(&template_id).map_err(|e| e.to_string())?;
 
-    // Create the instance directory
     let instance_dir = get_instance_dir(&instance_name);
     if instance_dir.exists() {
         return Err(format!("Instance '{}' already exists", instance_name));
@@ -87,7 +86,6 @@ pub async fn create_instance_from_template(
 
     fs::create_dir_all(&instance_dir).map_err(|e| format!("Failed to create instance directory: {}", e))?;
 
-    // Create the instance with template settings
     let instance = Instance {
         name: instance_name.clone(),
         version: minecraft_version,
@@ -99,14 +97,12 @@ pub async fn create_instance_from_template(
         settings_override: template.launcher_settings,
     };
 
-    // Save instance metadata
     let instance_json = instance_dir.join("instance.json");
     let json = serde_json::to_string_pretty(&instance)
         .map_err(|e| format!("Failed to serialize instance: {}", e))?;
     fs::write(&instance_json, json)
         .map_err(|e| format!("Failed to write instance.json: {}", e))?;
 
-    // Apply Minecraft options if present
     if let Some(minecraft_options) = template.minecraft_options {
         let options_path = instance_dir.join("options.txt");
         let mut options_content = String::new();
@@ -156,12 +152,10 @@ pub async fn import_template(
     let export: TemplateExport = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse template file: {}", e))?;
 
-    // Validate version (for future compatibility)
     if export.version != "1.0.0" {
         return Err(format!("Unsupported template version: {}. Expected 1.0.0", export.version));
     }
 
-    // Create a new template from the imported data
     let template = TemplateManager::create_template(
         export.template.name,
         export.template.description,

@@ -40,20 +40,32 @@ pub struct InstanceTemplate {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MinecraftOptions {
+    // Video - Basic
     pub fov: Option<f32>,
-    pub render_distance: Option<u8>,
-    pub max_fps: Option<u32>,
+    pub render_distance: Option<i32>,
+    pub simulation_distance: Option<i32>,
+    pub max_fps: Option<i32>,
     pub fullscreen: Option<bool>,
     pub vsync: Option<bool>,
-    pub gui_scale: Option<u8>,
+    pub gui_scale: Option<i32>,
     pub brightness: Option<f32>,
+    
+    // Video - Quality
     pub entity_shadows: Option<bool>,
     pub particles: Option<String>,
     pub graphics: Option<String>,
+    pub graphics_preset: Option<String>,
     pub smooth_lighting: Option<bool>,
-    pub biome_blend: Option<u8>,
+    pub biome_blend: Option<i32>,
+    pub mipmap_levels: Option<i32>,
+    pub chunk_updates_mode: Option<i32>,
+    pub cloud_rendering: Option<String>,
+    pub vignette: Option<bool>,
+    
+    // Audio
     pub master_volume: Option<f32>,
     pub music_volume: Option<f32>,
+    pub record_volume: Option<f32>,
     pub weather_volume: Option<f32>,
     pub blocks_volume: Option<f32>,
     pub hostile_volume: Option<f32>,
@@ -61,13 +73,31 @@ pub struct MinecraftOptions {
     pub players_volume: Option<f32>,
     pub ambient_volume: Option<f32>,
     pub voice_volume: Option<f32>,
+    
+    // Controls - Mouse
     pub mouse_sensitivity: Option<f32>,
     pub invert_mouse: Option<bool>,
+    pub raw_input: Option<bool>,
+    pub discrete_mouse_scroll: Option<bool>,
+    pub touchscreen: Option<bool>,
+    
+    // Controls - Movement
     pub auto_jump: Option<bool>,
     pub sneak_toggles: Option<bool>,
     pub sprint_toggles: Option<bool>,
-    pub raw_input: Option<bool>,
-    pub keybinds: Option<std::collections::HashMap<String, String>>,
+    
+    // Chat & Accessibility
+    pub narrator: Option<i32>,
+    pub chat_opacity: Option<f32>,
+    pub chat_line_spacing: Option<f32>,
+    pub text_background_opacity: Option<f32>,
+    pub chat_height_focused: Option<f32>,
+    pub chat_height_unfocused: Option<f32>,
+    pub chat_width: Option<f32>,
+    pub damage_tilt_strength: Option<f32>,
+    
+    // Keybinds
+    pub keybinds: Option<HashMap<String, String>>,
 }
 
 // ===== SETTINGS MODELS =====
