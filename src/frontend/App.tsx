@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
-import { LogOut, Settings, LogIn, Home, Package, Puzzle, Terminal, Minus, Square, X, Server, Play, ChevronUp, ChevronDown, HatGlasses } from "lucide-react"
+import { LogOut, Settings, LogIn, Home, Package, Puzzle, Terminal, Minus, Square, X, Server, Play, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, HatGlasses } from "lucide-react"
 import { HomeTab } from "./tabs/HomeTab"
 import { InstancesTab } from "./tabs/InstancesTab"
 import { BrowseTab } from "./tabs/BrowseTab"
@@ -56,6 +56,9 @@ function App() {
     type: "warning" | "danger" | "success" | "info"
   } | null>(null)
   const [instanceIcons, setInstanceIcons] = useState<Record<string, string | null>>({})
+  const [navigationHistory, setNavigationHistory] = useState<Array<{tab: typeof activeTab, showDetails: boolean, instance: Instance | null}>>([])
+  const [historyIndex, setHistoryIndex] = useState(-1)
+  const [isNavigating, setIsNavigating] = useState(false)
 
   const appWindow = getCurrentWindow()
 
@@ -102,6 +105,47 @@ function App() {
     return 'Just now'
   }
 
+  const pushToHistory = (tab: typeof activeTab, showDetails: boolean, instance: Instance | null) => {
+    if (isNavigating) return
+    
+    setNavigationHistory(prev => {
+      const newHistory = prev.slice(0, historyIndex + 1)
+      newHistory.push({ tab, showDetails, instance })
+      return newHistory
+    })
+    setHistoryIndex(prev => prev + 1)
+  }
+
+  const navigateBack = () => {
+    if (historyIndex > 0) {
+      setIsNavigating(true)
+      const newIndex = historyIndex - 1
+      const state = navigationHistory[newIndex]
+      setActiveTab(state.tab)
+      setShowInstanceDetails(state.showDetails)
+      if (state.instance) {
+        setSelectedInstance(state.instance)
+      }
+      setHistoryIndex(newIndex)
+      setTimeout(() => setIsNavigating(false), 0)
+    }
+  }
+
+  const navigateForward = () => {
+    if (historyIndex < navigationHistory.length - 1) {
+      setIsNavigating(true)
+      const newIndex = historyIndex + 1
+      const state = navigationHistory[newIndex]
+      setActiveTab(state.tab)
+      setShowInstanceDetails(state.showDetails)
+      if (state.instance) {
+        setSelectedInstance(state.instance)
+      }
+      setHistoryIndex(newIndex)
+      setTimeout(() => setIsNavigating(false), 0)
+    }
+  }
+
   useEffect(() => {
     const initializeApp = async () => {
       setIsReady(true)
@@ -125,6 +169,12 @@ function App() {
       unlisten.then((fn) => fn())
     }
   }, [isReady])
+
+  useEffect(() => {
+    if (!isNavigating && isReady) {
+      pushToHistory(activeTab, showInstanceDetails, selectedInstance)
+    }
+  }, [activeTab, showInstanceDetails, selectedInstance?.name])
 
   useEffect(() => {
     const loadIcons = async () => {
@@ -383,39 +433,34 @@ function App() {
         style={{ userSelect: 'none', WebkitAppRegion: 'drag' } as any}
         className="h-10 bg-[#1a1a1a] flex-shrink-0 fixed top-0 left-0 right-0 z-50 flex items-center px-4"
       >
-        <div className="flex items-center gap-2 mr-23">
+        <div className="flex items-center gap-2 mr-20">
           <img src="/logo.png" alt="Atomic Launcher" className="h-5 w-5" />
           <span className="text-sm font-semibold text-[#e8e8e8]">Atomic Launcher</span>
         </div>
-        <div className="flex items-center gap-2 text-sm flex-1">
+        
+        <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as any}>
           <button
-            onClick={() => {
-              setActiveTab("home")
-              setShowInstanceDetails(false)
-            }}
-            className={`transition-colors cursor-pointer ${activeTab === "home" && !showInstanceDetails ? "text-[#e8e8e8] font-semibold" : "text-[#808080] hover:text-[#e8e8e8]"}`}
-            style={{ WebkitAppRegion: 'no-drag' } as any}
+            onClick={navigateBack}
+            disabled={historyIndex <= 0}
+            className={`h-7 w-7 flex items-center justify-center rounded transition-colors ${
+              historyIndex > 0
+                ? "text-[#e8e8e8] hover:bg-[#2a2a2a] cursor-pointer" 
+                : "text-[#4a4a4a] cursor-not-allowed"
+            }`}
           >
-            Home
+            <ChevronLeft size={16} strokeWidth={4} />
           </button>
-          {activeTab !== "home" && (
-            <>
-              <span className="text-[#4a4a4a]">›</span>
-              <button
-                onClick={() => setShowInstanceDetails(false)}
-                className={`transition-colors capitalize cursor-pointer ${!showInstanceDetails ? "text-[#e8e8e8] font-semibold" : "text-[#808080] hover:text-[#e8e8e8]"}`}
-                style={{ WebkitAppRegion: 'no-drag' } as any}
-              >
-                {activeTab === "browse" ? "Mods" : activeTab}
-              </button>
-            </>
-          )}
-          {showInstanceDetails && selectedInstance && (
-            <>
-              <span className="text-[#4a4a4a]">›</span>
-              <span className="text-[#e8e8e8] font-semibold">{selectedInstance.name}</span>
-            </>
-          )}
+          <button
+            onClick={navigateForward}
+            disabled={historyIndex >= navigationHistory.length - 1}
+            className={`h-7 w-7 flex items-center justify-center rounded transition-colors ${
+              historyIndex < navigationHistory.length - 1
+                ? "text-[#e8e8e8] hover:bg-[#2a2a2a] cursor-pointer" 
+                : "text-[#4a4a4a] cursor-not-allowed"
+            }`}
+          >
+            <ChevronRight size={16} strokeWidth={4} />
+          </button>
         </div>
 
         <div className="flex items-center ml-auto" style={{ WebkitAppRegion: 'no-drag' } as any}>
