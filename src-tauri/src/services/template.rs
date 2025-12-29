@@ -264,7 +264,7 @@ impl TemplateManager {
         Ok(())
     }
 
-    fn merge_options_txt(
+    pub fn merge_options_txt(
         existing: &mut String,
         options: &MinecraftOptions,
     ) -> Result<(), Box<dyn std::error::Error>> {

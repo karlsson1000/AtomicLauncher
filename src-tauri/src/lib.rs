@@ -76,6 +76,8 @@ use commands::{
     create_template_from_instance,
     apply_template_to_instance,
     create_instance_from_template,
+    export_template,
+    import_template,
     
     // Skin commands
     upload_skin,
@@ -109,6 +111,7 @@ async fn frontend_ready(app: AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             // Splash screen
             frontend_ready,
@@ -202,6 +205,8 @@ pub fn run() {
             create_template_from_instance,
             apply_template_to_instance,
             create_instance_from_template,
+            export_template,
+            import_template,
 
             // Open links
             open_url,

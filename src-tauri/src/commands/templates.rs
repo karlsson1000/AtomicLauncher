@@ -1,145 +1,174 @@
-use crate::commands::validation::{
-    sanitize_instance_name, validate_java_path, validate_memory_allocation,
-};
-use crate::models::{InstanceTemplate, LauncherSettings, MinecraftOptions};
+use crate::models::{Instance, InstanceTemplate, LauncherSettings, MinecraftOptions};
 use crate::services::template::TemplateManager;
+use crate::utils::get_instance_dir;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use tauri::command;
 
-#[tauri::command]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TemplateExport {
+    pub version: String,
+    pub template: TemplateExportData,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TemplateExportData {
+    pub name: String,
+    pub description: Option<String>,
+    pub launcher_settings: Option<LauncherSettings>,
+    pub minecraft_options: Option<MinecraftOptions>,
+}
+
+#[command]
 pub async fn create_template(
     name: String,
     description: Option<String>,
     launcher_settings: Option<LauncherSettings>,
     minecraft_options: Option<MinecraftOptions>,
 ) -> Result<InstanceTemplate, String> {
-    if name.trim().is_empty() {
-        return Err("Template name cannot be empty".to_string());
-    }
-    
-    if name.len() > 100 {
-        return Err("Template name too long (max 100 characters)".to_string());
-    }
-    
-    if let Some(ref settings) = launcher_settings {
-        if let Some(ref java_path) = settings.java_path {
-            validate_java_path(java_path)?;
-        }
-        validate_memory_allocation(settings.memory_mb as u64)?;
-    }
-    
-    TemplateManager::create_template(
-        name,
-        description,
-        launcher_settings,
-        minecraft_options,
-    )
-    .map_err(|e| format!("Failed to create template: {}", e))
+    TemplateManager::create_template(name, description, launcher_settings, minecraft_options)
+        .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[command]
 pub async fn get_templates() -> Result<Vec<InstanceTemplate>, String> {
-    TemplateManager::get_all_templates()
-        .map_err(|e| format!("Failed to get templates: {}", e))
+    TemplateManager::get_all_templates().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[command]
 pub async fn get_template(template_id: String) -> Result<InstanceTemplate, String> {
-    if !template_id.chars().all(|c| c.is_alphanumeric() || c == '-') {
-        return Err("Invalid template ID format".to_string());
-    }
-    
-    TemplateManager::get_template(&template_id)
-        .map_err(|e| format!("Failed to get template: {}", e))
+    TemplateManager::get_template(&template_id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-pub async fn update_template(template: InstanceTemplate) -> Result<String, String> {
-    if template.name.trim().is_empty() {
-        return Err("Template name cannot be empty".to_string());
-    }
-    
-    if template.name.len() > 100 {
-        return Err("Template name too long (max 100 characters)".to_string());
-    }
-    
-    if let Some(ref settings) = template.launcher_settings {
-        if let Some(ref java_path) = settings.java_path {
-            validate_java_path(java_path)?;
-        }
-        validate_memory_allocation(settings.memory_mb as u64)?;
-    }
-    
-    TemplateManager::update_template(template)
-        .map_err(|e| format!("Failed to update template: {}", e))?;
-    
-    Ok("Template updated successfully".to_string())
+#[command]
+pub async fn update_template(template: InstanceTemplate) -> Result<(), String> {
+    TemplateManager::update_template(template).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-pub async fn delete_template(template_id: String) -> Result<String, String> {
-    if !template_id.chars().all(|c| c.is_alphanumeric() || c == '-') {
-        return Err("Invalid template ID format".to_string());
-    }
-    
-    TemplateManager::delete_template(&template_id)
-        .map_err(|e| format!("Failed to delete template: {}", e))?;
-    
-    Ok("Template deleted successfully".to_string())
+#[command]
+pub async fn delete_template(template_id: String) -> Result<(), String> {
+    TemplateManager::delete_template(&template_id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[command]
 pub async fn create_template_from_instance(
     instance_name: String,
     template_name: String,
     description: Option<String>,
 ) -> Result<InstanceTemplate, String> {
-    let safe_instance_name = sanitize_instance_name(&instance_name)?;
-    
-    if template_name.trim().is_empty() {
-        return Err("Template name cannot be empty".to_string());
-    }
-    
-    if template_name.len() > 100 {
-        return Err("Template name too long (max 100 characters)".to_string());
-    }
-    
-    TemplateManager::create_from_instance(&safe_instance_name, template_name, description)
-        .map_err(|e| format!("Failed to create template from instance: {}", e))
+    TemplateManager::create_from_instance(&instance_name, template_name, description)
+        .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[command]
 pub async fn apply_template_to_instance(
     template_id: String,
     instance_name: String,
-) -> Result<String, String> {
-    if !template_id.chars().all(|c| c.is_alphanumeric() || c == '-') {
-        return Err("Invalid template ID format".to_string());
-    }
-    
-    let safe_instance_name = sanitize_instance_name(&instance_name)?;
-    
-    TemplateManager::apply_template_to_instance(&template_id, &safe_instance_name)
-        .map_err(|e| format!("Failed to apply template: {}", e))?;
-    
-    Ok(format!("Template applied successfully to instance '{}'", safe_instance_name))
+) -> Result<(), String> {
+    TemplateManager::apply_template_to_instance(&template_id, &instance_name)
+        .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[command]
 pub async fn create_instance_from_template(
-    instance_name: String,
-    version: String,
     template_id: String,
-    loader: Option<String>,
+    instance_name: String,
+    minecraft_version: String,
+    loader: String,
     loader_version: Option<String>,
+) -> Result<Instance, String> {
+    let template = TemplateManager::get_template(&template_id).map_err(|e| e.to_string())?;
+
+    // Create the instance directory
+    let instance_dir = get_instance_dir(&instance_name);
+    if instance_dir.exists() {
+        return Err(format!("Instance '{}' already exists", instance_name));
+    }
+
+    fs::create_dir_all(&instance_dir).map_err(|e| format!("Failed to create instance directory: {}", e))?;
+
+    // Create the instance with template settings
+    let instance = Instance {
+        name: instance_name.clone(),
+        version: minecraft_version,
+        loader: Some(loader),
+        loader_version,
+        created_at: chrono::Utc::now().to_rfc3339(),
+        last_played: None,
+        icon_path: None,
+        settings_override: template.launcher_settings,
+    };
+
+    // Save instance metadata
+    let instance_json = instance_dir.join("instance.json");
+    let json = serde_json::to_string_pretty(&instance)
+        .map_err(|e| format!("Failed to serialize instance: {}", e))?;
+    fs::write(&instance_json, json)
+        .map_err(|e| format!("Failed to write instance.json: {}", e))?;
+
+    // Apply Minecraft options if present
+    if let Some(minecraft_options) = template.minecraft_options {
+        let options_path = instance_dir.join("options.txt");
+        let mut options_content = String::new();
+        TemplateManager::merge_options_txt(&mut options_content, &minecraft_options)
+            .map_err(|e| format!("Failed to create options.txt: {}", e))?;
+        fs::write(&options_path, options_content)
+            .map_err(|e| format!("Failed to write options.txt: {}", e))?;
+    }
+
+    Ok(instance)
+}
+
+#[command]
+pub async fn export_template(
+    template_id: String,
+    export_path: String,
 ) -> Result<String, String> {
-    // Import the create_instance function from instances module
-    crate::commands::instances::create_instance(
-        instance_name.clone(), 
-        version, 
-        loader, 
-        loader_version
-    ).await?;
-    
-    apply_template_to_instance(template_id, instance_name).await?;
-    
-    Ok("Instance created from template successfully".to_string())
+    let template = TemplateManager::get_template(&template_id)
+        .map_err(|e| format!("Failed to get template: {}", e))?;
+
+    let export = TemplateExport {
+        version: "1.0.0".to_string(),
+        template: TemplateExportData {
+            name: template.name,
+            description: template.description,
+            launcher_settings: template.launcher_settings,
+            minecraft_options: template.minecraft_options,
+        },
+    };
+
+    let json = serde_json::to_string_pretty(&export)
+        .map_err(|e| format!("Failed to serialize template: {}", e))?;
+
+    fs::write(&export_path, json)
+        .map_err(|e| format!("Failed to write template file: {}", e))?;
+
+    Ok(format!("Template exported successfully to {}", export_path))
+}
+
+#[command]
+pub async fn import_template(
+    import_path: String,
+) -> Result<InstanceTemplate, String> {
+    let content = fs::read_to_string(&import_path)
+        .map_err(|e| format!("Failed to read template file: {}", e))?;
+
+    let export: TemplateExport = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse template file: {}", e))?;
+
+    // Validate version (for future compatibility)
+    if export.version != "1.0.0" {
+        return Err(format!("Unsupported template version: {}. Expected 1.0.0", export.version));
+    }
+
+    // Create a new template from the imported data
+    let template = TemplateManager::create_template(
+        export.template.name,
+        export.template.description,
+        export.template.launcher_settings,
+        export.template.minecraft_options,
+    )
+    .map_err(|e| format!("Failed to create template: {}", e))?;
+
+    Ok(template)
 }
