@@ -14,6 +14,14 @@ interface CachedSkin {
   timestamp: number
 }
 
+interface Cape {
+  id: string
+  state: string
+  url: string
+  alias: string
+  icon?: string
+}
+
 export function SkinsTab(props: SkinsTabProps) {
   const { activeAccount, isAuthenticated, invoke } = props
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -24,6 +32,9 @@ export function SkinsTab(props: SkinsTabProps) {
   const [uploading, setUploading] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [skinVariant, setSkinVariant] = useState<"classic" | "slim">("classic")
+  const [capes, setCapes] = useState<Cape[]>([])
+  const [activeCape, setActiveCape] = useState<string | null>(null)
+  const [loadingCapes, setLoadingCapes] = useState(false)
   const skinCacheRef = useRef<Map<string, CachedSkin>>(new Map())
   const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
@@ -82,6 +93,22 @@ export function SkinsTab(props: SkinsTabProps) {
     }
   }, [viewerRef.current])
 
+  const getCapeImageName = (alias: string) => {
+    // Handle special cases
+    const specialCases: Record<string, string> = {
+      "follower's": "followers",
+      "purple heart": "purple",
+      "15th anniversary": "15th"
+    }
+    
+    const lowerAlias = alias.toLowerCase()
+    if (specialCases[lowerAlias]) {
+      return specialCases[lowerAlias]
+    }
+    
+    return lowerAlias.replace(/\s+/g, '_').replace(/['']/g, '')
+  }
+
   const loadUserSkin = async (viewer: any) => {
     if (!isAuthenticated || !activeAccount || !invoke) {
       setLoading(false)
@@ -105,6 +132,7 @@ export function SkinsTab(props: SkinsTabProps) {
         setSkinVariant(cached.variant)
         viewer.render()
         setLoading(false)
+        loadCapes()
         return
       }
       
@@ -126,6 +154,7 @@ export function SkinsTab(props: SkinsTabProps) {
         
         viewer.render()
         setLoading(false)
+        loadCapes()
       } else {
         const defaultSkinUrl = `https://cravatar.eu/avatar/${activeAccount.username}/128.png`
         await viewer.loadSkin(defaultSkinUrl)
@@ -139,6 +168,7 @@ export function SkinsTab(props: SkinsTabProps) {
         
         viewer.render()
         setLoading(false)
+        loadCapes()
       }
     } catch (err) {
       console.error("Failed to load skin:", err)
@@ -152,6 +182,71 @@ export function SkinsTab(props: SkinsTabProps) {
       } catch (fallbackErr) {
         console.error("Fallback skin also failed:", fallbackErr)
       }
+    }
+  }
+
+  const loadCapes = async () => {
+    if (!invoke || !isAuthenticated) return
+
+    try {
+      setLoadingCapes(true)
+      const capeData = await invoke("get_user_capes")
+      
+      if (capeData && capeData.capes) {
+        setCapes(capeData.capes)
+        const active = capeData.capes.find((cape: Cape) => cape.state === "ACTIVE")
+        const activeCapeId = active?.id || null
+        setActiveCape(activeCapeId)
+
+        if (active && viewerRef.current) {
+          try {
+            await viewerRef.current.loadCape(active.url)
+            viewerRef.current.render()
+          } catch (err) {
+            console.error("Failed to load active cape in viewer:", err)
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load capes:", err)
+    } finally {
+      setLoadingCapes(false)
+    }
+  }
+
+  const handleCapeSelect = async (capeUrl: string, capeId: string) => {
+    if (!viewerRef.current || !invoke) return
+
+    try {
+      // Update 3D viewer
+      await viewerRef.current.loadCape(capeUrl)
+      viewerRef.current.render()
+      
+      // Equip cape on Minecraft servers
+      await invoke("equip_cape", { capeId })
+      
+      setActiveCape(capeId)
+    } catch (err) {
+      console.error("Failed to equip cape:", err)
+      setError(`Failed to equip cape: ${err}`)
+    }
+  }
+
+  const handleCapeRemove = async () => {
+    if (!viewerRef.current || !invoke) return
+    
+    try {
+      // Remove from 3D viewer
+      viewerRef.current.loadCape(null)
+      viewerRef.current.render()
+      
+      // Remove cape on Minecraft servers
+      await invoke("remove_cape")
+      
+      setActiveCape(null)
+    } catch (err) {
+      console.error("Failed to remove cape:", err)
+      setError(`Failed to remove cape: ${err}`)
     }
   }
 
@@ -244,7 +339,7 @@ export function SkinsTab(props: SkinsTabProps) {
           </div>
         </div>
 
-        <div className="flex gap-24 items-center justify-center">
+        <div className="flex gap-24 items-start justify-center">
           {/* 3D Skin Viewer */}
           <div className="flex-shrink-0">
             <div className="rounded-xl overflow-hidden relative">
@@ -267,7 +362,7 @@ export function SkinsTab(props: SkinsTabProps) {
           </div>
 
           {/* Controls Panel */}
-          <div className="flex-1 max-w-sm">
+          <div className="flex-1 max-w-sm space-y-4">
             <div className="bg-[#1a1a1a] rounded-xl p-5">
               <h3 className="text-base font-semibold text-[#e8e8e8] mb-4">Skin Model</h3>
               
@@ -352,9 +447,60 @@ export function SkinsTab(props: SkinsTabProps) {
                 </button>
               </div>
             </div>
+
+            {/* Capes Section */}
+            <div className="bg-[#1a1a1a] rounded-xl p-5">
+              <h3 className="text-base font-semibold text-[#e8e8e8] mb-4">Capes</h3>
+              
+              {loadingCapes ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 size={24} className="animate-spin text-[#16a34a]" />
+                </div>
+              ) : capes.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-4 gap-2">
+                    {capes.map((cape) => (
+                      <button
+                        key={cape.id}
+                        onClick={() => handleCapeSelect(cape.url, cape.id)}
+                        className={`w-20 h-32 bg-[#0d0d0d] rounded overflow-hidden flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-[#16a34a] ${
+                          activeCape === cape.id
+                            ? "ring-2 ring-[#16a34a]"
+                            : ""
+                        }`}
+                        title={cape.alias}
+                      >
+                        <img 
+                          src={`/capes/${getCapeImageName(cape.alias)}.png`}
+                          alt={cape.alias}
+                          className="w-full h-full object-contain"
+                          style={{ imageRendering: 'pixelated' }}
+                          onError={(e) => {
+                            e.currentTarget.src = '/logo.png'
+                          }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {activeCape && (
+                    <button
+                      onClick={handleCapeRemove}
+                      className="w-full px-3 py-2.5 bg-[#0d0d0d] hover:bg-[#1f1f1f] text-[#808080] hover:text-[#e8e8e8] rounded-lg text-sm font-medium transition-all cursor-pointer"
+                    >
+                      Remove Cape
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-[#808080] text-center py-4">
+                  No capes available
+                </p>
+              )}
+            </div>
             
             {error && (
-              <div className="mt-4 bg-[#1a1a1a] rounded-lg p-4">
+              <div className="bg-[#1a1a1a] rounded-lg p-4">
                 <p className="text-xs text-red-400 leading-relaxed">{error}</p>
               </div>
             )}

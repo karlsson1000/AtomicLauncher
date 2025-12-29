@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 const MINECRAFT_SKIN_URL: &str = "https://api.minecraftservices.com/minecraft/profile/skins";
 const MINECRAFT_SKIN_RESET_URL: &str = "https://api.minecraftservices.com/minecraft/profile/skins/active";
 const MINECRAFT_PROFILE_URL: &str = "https://api.minecraftservices.com/minecraft/profile";
+const MINECRAFT_SESSION_URL: &str = "https://sessionserver.mojang.com/session/minecraft/profile";
 
 #[derive(Serialize, Deserialize)]
 pub struct SkinUploadResponse {
@@ -29,18 +30,71 @@ struct SkinInfo {
     alias: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
-struct CapeInfo {
-    id: String,
-    state: String,
-    url: String,
-    alias: String,
+#[derive(Deserialize, Debug, Clone, Serialize)]
+pub struct CapeInfo {
+    pub id: String,
+    pub state: String,
+    pub url: String,
+    pub alias: String,
 }
 
 #[derive(Serialize)]
 pub struct CurrentSkin {
     pub url: String,
     pub variant: String,
+    pub cape_url: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct UserCapesResponse {
+    pub capes: Vec<CapeInfo>,
+}
+
+#[derive(Deserialize, Debug)]
+struct SessionProfileResponse {
+    id: String,
+    name: String,
+    properties: Vec<ProfileProperty>,
+}
+
+#[derive(Deserialize, Debug)]
+struct ProfileProperty {
+    name: String,
+    value: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct TexturesData {
+    timestamp: u64,
+    #[serde(rename = "profileId")]
+    profile_id: String,
+    #[serde(rename = "profileName")]
+    profile_name: String,
+    textures: Textures,
+}
+
+#[derive(Deserialize, Debug)]
+struct Textures {
+    #[serde(rename = "SKIN")]
+    skin: Option<SkinTexture>,
+    #[serde(rename = "CAPE")]
+    cape: Option<CapeTexture>,
+}
+
+#[derive(Deserialize, Debug)]
+struct SkinTexture {
+    url: String,
+    metadata: Option<SkinMetadata>,
+}
+
+#[derive(Deserialize, Debug)]
+struct SkinMetadata {
+    model: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+struct CapeTexture {
+    url: String,
 }
 
 /// Upload a skin to Minecraft
@@ -142,6 +196,7 @@ pub async fn get_current_skin() -> Result<Option<CurrentSkin>, String> {
     
     let client = reqwest::Client::new();
     
+    // Get profile from Microsoft API for skin info
     let response = client
         .get(MINECRAFT_PROFILE_URL)
         .bearer_auth(&active_account.access_token)
@@ -160,12 +215,156 @@ pub async fn get_current_skin() -> Result<Option<CurrentSkin>, String> {
         .await
         .map_err(|e| format!("Failed to parse profile response: {}", e))?;
     
+    // Get cape from session server
+    let cape_url = get_player_cape(&profile.id).await.ok();
+    
     if let Some(active_skin) = profile.skins.iter().find(|s| s.state == "ACTIVE") {
         Ok(Some(CurrentSkin {
             url: active_skin.url.clone(),
             variant: active_skin.variant.to_lowercase(),
+            cape_url,
         }))
     } else {
         Ok(None)
     }
+}
+
+/// Get user's capes from Microsoft profile
+#[tauri::command]
+pub async fn get_user_capes() -> Result<UserCapesResponse, String> {
+    let active_account = AccountManager::get_active_account()
+        .map_err(|e| format!("Failed to get active account: {}", e))?
+        .ok_or_else(|| "No active account. Please sign in first.".to_string())?;
+    
+    let client = reqwest::Client::new();
+    
+    let response = client
+        .get(MINECRAFT_PROFILE_URL)
+        .bearer_auth(&active_account.access_token)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch profile: {}", e))?;
+    
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(format!("Failed to get profile ({}): {}", status, error_text));
+    }
+    
+    let profile: ProfileResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse profile response: {}", e))?;
+    
+    let capes = profile.capes.unwrap_or_default();
+    
+    Ok(UserCapesResponse { capes })
+}
+
+/// Helper function to get player's cape from session server
+async fn get_player_cape(uuid: &str) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    
+    // Remove dashes from UUID for session server
+    let uuid_no_dashes = uuid.replace("-", "");
+    let url = format!("{}/{}", MINECRAFT_SESSION_URL, uuid_no_dashes);
+    
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch session profile: {}", e))?;
+    
+    if !response.status().is_success() {
+        return Err("Failed to get session profile".to_string());
+    }
+    
+    let session_profile: SessionProfileResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse session profile: {}", e))?;
+    
+    // Find textures property
+    let textures_property = session_profile
+        .properties
+        .iter()
+        .find(|p| p.name == "textures")
+        .ok_or_else(|| "No textures property found".to_string())?;
+    
+    // Decode base64 value
+    let decoded = general_purpose::STANDARD
+        .decode(&textures_property.value)
+        .map_err(|e| format!("Failed to decode textures: {}", e))?;
+    
+    let textures_str = String::from_utf8(decoded)
+        .map_err(|e| format!("Invalid UTF-8 in textures: {}", e))?;
+    
+    let textures_data: TexturesData = serde_json::from_str(&textures_str)
+        .map_err(|e| format!("Failed to parse textures JSON: {}", e))?;
+    
+    // Extract cape URL if present
+    textures_data
+        .textures
+        .cape
+        .map(|cape| cape.url)
+        .ok_or_else(|| "No cape found".to_string())
+}
+
+/// Equip a cape by its ID
+#[tauri::command]
+pub async fn equip_cape(cape_id: String) -> Result<String, String> {
+    let active_account = AccountManager::get_active_account()
+        .map_err(|e| format!("Failed to get active account: {}", e))?
+        .ok_or_else(|| "No active account. Please sign in first.".to_string())?;
+    
+    let client = reqwest::Client::new();
+    
+    let url = format!("https://api.minecraftservices.com/minecraft/profile/capes/active");
+    
+    let body = serde_json::json!({
+        "capeId": cape_id
+    });
+    
+    let response = client
+        .put(&url)
+        .bearer_auth(&active_account.access_token)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to equip cape: {}", e))?;
+    
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(format!("Cape equip failed ({}): {}", status, error_text));
+    }
+    
+    Ok("Cape equipped successfully".to_string())
+}
+
+/// Remove the active cape
+#[tauri::command]
+pub async fn remove_cape() -> Result<String, String> {
+    let active_account = AccountManager::get_active_account()
+        .map_err(|e| format!("Failed to get active account: {}", e))?
+        .ok_or_else(|| "No active account. Please sign in first.".to_string())?;
+    
+    let client = reqwest::Client::new();
+    
+    let url = "https://api.minecraftservices.com/minecraft/profile/capes/active";
+    
+    let response = client
+        .delete(url)
+        .bearer_auth(&active_account.access_token)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to remove cape: {}", e))?;
+    
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(format!("Cape removal failed ({}): {}", status, error_text));
+    }
+    
+    Ok("Cape removed successfully".to_string())
 }

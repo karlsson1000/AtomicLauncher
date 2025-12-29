@@ -81,6 +81,9 @@ use commands::{
     upload_skin,
     reset_skin,
     get_current_skin,
+    get_user_capes,
+    equip_cape,
+    remove_cape,
     
     // System commands
     get_system_info,
@@ -123,6 +126,9 @@ pub fn run() {
             upload_skin,
             reset_skin,
             get_current_skin,
+            get_user_capes,
+            equip_cape,
+            remove_cape,
             
             // Minecraft versions
             get_minecraft_versions,
