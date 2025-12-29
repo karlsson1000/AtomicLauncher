@@ -160,6 +160,7 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
     if (!newInstanceName.trim() || instanceExists) return
 
     setIsCreating(true)
+
     onStartCreating(newInstanceName)
     onClose()
     
@@ -170,6 +171,7 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
         loader: loaderType === "fabric" ? "fabric" : null,
         loaderVersion: loaderType === "fabric" ? selectedFabricVersion : null,
       })
+
       onSuccess()
     } catch (error) {
       console.error("Create instance error:", error)

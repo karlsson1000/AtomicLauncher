@@ -6,7 +6,6 @@ import { open, save } from '@tauri-apps/plugin-dialog'
 import type { Instance } from "../../types"
 import { ContextMenu } from "../modals/ContextMenu"
 import { ConfirmModal, AlertModal } from "../modals/ConfirmModal"
-import { CreationProgressToast } from "../modals/CreationProgressToast"
 
 interface InstanceTemplate {
   id: string
@@ -79,7 +78,6 @@ export function InstancesTab({
   const [showApplyMenu, setShowApplyMenu] = useState(false)
   const [templates, setTemplates] = useState<InstanceTemplate[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
-  const [creatingTemplate, setCreatingTemplate] = useState<string | null>(null)
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean
     title: string
@@ -182,7 +180,6 @@ export function InstancesTab({
   }
 
   const handleCreateTemplate = async (instanceName: string) => {
-    setCreatingTemplate(instanceName)
     setShowTemplateMenu(false)
     
     try {
@@ -192,6 +189,13 @@ export function InstancesTab({
         description: `Template created from ${instanceName}`
       })
       await loadTemplates()
+
+      setAlertModal({
+        isOpen: true,
+        title: "Success",
+        message: `Template created from "${instanceName}" successfully!`,
+        type: "success"
+      })
     } catch (error) {
       console.error("Failed to create template:", error)
       setAlertModal({
@@ -200,7 +204,6 @@ export function InstancesTab({
         message: `Failed to create template: ${error}`,
         type: "danger"
       })
-      setCreatingTemplate(null)
     }
   }
 
@@ -670,16 +673,6 @@ export function InstancesTab({
               danger: true,
             },
           ]}
-        />
-      )}
-
-      {/* Template Creation Toast */}
-      {creatingTemplate && (
-        <CreationProgressToast
-          instanceName={`Template: ${creatingTemplate}`}
-          onComplete={() => setCreatingTemplate(null)}
-          onError={() => setCreatingTemplate(null)}
-          onDismiss={() => setCreatingTemplate(null)}
         />
       )}
 

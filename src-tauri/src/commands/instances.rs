@@ -14,6 +14,7 @@ pub async fn create_instance(
     version: String,
     loader: Option<String>,
     loader_version: Option<String>,
+    app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
     let safe_name = sanitize_instance_name(&instance_name)?;
     
@@ -33,29 +34,63 @@ pub async fn create_instance(
         }
     }
 
+    let _ = app_handle.emit("creation-progress", serde_json::json!({
+        "instance": safe_name,
+        "progress": 0,
+        "stage": "Starting instance creation..."
+    }));
+
     println!("Creating instance: {}", safe_name);
     println!("Minecraft version: {}", version);
     println!("Loader type: {:?}", loader);
-    println!("Loader version: {:?}", loader_version);
+
+    let _ = app_handle.emit("creation-progress", serde_json::json!({
+        "instance": safe_name,
+        "progress": 10,
+        "stage": format!("Checking Minecraft {}...", version)
+    }));
 
     let meta_dir = get_meta_dir();
     let installer = MinecraftInstaller::new(meta_dir.clone());
+    
+    // Check if already installed
+    let needs_installation = !installer.check_version_installed(&version);
+    
+    if needs_installation {
+        let _ = app_handle.emit("creation-progress", serde_json::json!({
+            "instance": safe_name,
+            "progress": 20,
+            "stage": format!("Installing Minecraft {}...", version)
+        }));
 
-    println!("Step 1: Verifying/installing Minecraft {}...", version);
-    installer
-        .install_version(&version)
-        .await
-        .map_err(|e| {
-            let err_msg = format!("Failed to install Minecraft: {}", e);
-            println!("ERROR: {}", err_msg);
-            err_msg
-        })?;
+        installer
+            .install_version(&version)
+            .await
+            .map_err(|e| {
+                let err_msg = format!("Failed to install Minecraft: {}", e);
+                println!("ERROR: {}", err_msg);
+                err_msg
+            })?;
+    }
+
+    let _ = app_handle.emit("creation-progress", serde_json::json!({
+        "instance": safe_name,
+        "progress": 60,
+        "stage": "Minecraft version ready"
+    }));
+
     println!("✓ Minecraft {} is ready", version);
 
     let final_version = if let Some(loader_type) = &loader {
         if loader_type == "fabric" {
             if let Some(fabric_version) = &loader_version {
-                println!("Step 2: Verifying/installing Fabric loader {}...", fabric_version);
+                let _ = app_handle.emit("creation-progress", serde_json::json!({
+                    "instance": safe_name,
+                    "progress": 70,
+                    "stage": format!("Installing Fabric {}...", fabric_version)
+                }));
+
+                println!("Installing Fabric loader {}...", fabric_version);
                 let fabric_installer = FabricInstaller::new(meta_dir);
                 
                 match fabric_installer
@@ -78,21 +113,33 @@ pub async fn create_instance(
                 return Err(err_msg);
             }
         } else {
-            println!("Step 2: Using vanilla version (no mod loader)");
+            println!("Using vanilla version (no mod loader)");
             version.clone()
         }
     } else {
-        println!("Step 2: Using vanilla version (no mod loader)");
+        println!("Using vanilla version (no mod loader)");
         version.clone()
     };
 
-    println!("Step 3: Creating instance with version: {}", final_version);
+    let _ = app_handle.emit("creation-progress", serde_json::json!({
+        "instance": safe_name,
+        "progress": 90,
+        "stage": "Creating instance structure..."
+    }));
+
+    println!("Creating instance with version: {}", final_version);
     InstanceManager::create(&safe_name, &final_version, loader.clone(), loader_version.clone())
         .map_err(|e| {
             let err_msg = format!("Failed to create instance: {}", e);
             println!("ERROR: {}", err_msg);
             err_msg
         })?;
+
+    let _ = app_handle.emit("creation-progress", serde_json::json!({
+        "instance": safe_name,
+        "progress": 100,
+        "stage": "Instance created successfully!"
+    }));
 
     let success_msg = format!("Successfully created instance '{}'", safe_name);
     println!("✓ {}", success_msg);

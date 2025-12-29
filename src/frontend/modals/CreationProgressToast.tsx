@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Loader2, CheckCircle2, XCircle, X } from "lucide-react"
 import { listen } from "@tauri-apps/api/event"
 
@@ -16,103 +16,164 @@ interface ProgressPayload {
   current_file?: string
 }
 
-export function CreationProgressToast({ instanceName, onComplete, onDismiss }: CreationProgressToastProps) {
+export function CreationProgressToast({ 
+  instanceName, 
+  onComplete, 
+  onError,
+  onDismiss 
+}: CreationProgressToastProps) {
   const [progress, setProgress] = useState(0)
+  const [stage, setStage] = useState<string>("")
   const [status, setStatus] = useState<"creating" | "success" | "error">("creating")
-  const [hasRealProgress, setHasRealProgress] = useState(false)
+  const [hasReceivedProgress, setHasReceivedProgress] = useState(false)
+  
+  // Use refs to prevent issues with closures and timers
+  const isCompletingRef = useRef<boolean>(false)
+  const completionTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  const errorTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  const unlistenFunctionsRef = useRef<Array<() => void>>([])
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined
-    let completionTimer: NodeJS.Timeout | undefined
-    let fallbackTimer: NodeJS.Timeout | undefined
-
-    const setupListener = async () => {
-      // Listen for duplication progress events
-      const unlistenDuplication = await listen<ProgressPayload>("duplication-progress", (event) => {
-        if (event.payload.instance === instanceName) {
-          console.log("Duplication progress:", event.payload.progress)
-          setHasRealProgress(true)
-          setProgress(event.payload.progress)
-          
-          if (event.payload.progress >= 100) {
-            setStatus("success")
-            completionTimer = setTimeout(() => {
-              onComplete()
-            }, 1500)
+    const setupListeners = async () => {
+      console.log(`[ProgressToast] Setting up listeners for: ${instanceName}`)
+      
+      try {
+        // Listen for duplication progress events
+        const unlistenDuplication = await listen<ProgressPayload>("duplication-progress", (event) => {
+          if (event.payload.instance === instanceName) {
+            console.log(`[ProgressToast] Duplication progress: ${event.payload.progress}%`, event.payload.stage)
+            
+            setHasReceivedProgress(true)
+            setProgress(event.payload.progress)
+            
+            if (event.payload.stage) {
+              setStage(event.payload.stage)
+            }
+            
+            if (event.payload.progress >= 100 && !isCompletingRef.current) {
+              isCompletingRef.current = true
+              console.log(`[ProgressToast] Duplication complete!`)
+              setStatus("success")
+              
+              if (completionTimerRef.current) {
+                clearTimeout(completionTimerRef.current)
+              }
+              
+              completionTimerRef.current = setTimeout(() => {
+                onComplete()
+              }, 1500)
+            }
           }
-        }
-      })
-
-      // Listen for creation progress events
-      const unlistenCreation = await listen<ProgressPayload>("creation-progress", (event) => {
-        if (event.payload.instance === instanceName) {
-          console.log("Creation progress:", event.payload.progress)
-          setHasRealProgress(true)
-          setProgress(event.payload.progress)
-          
-          if (event.payload.progress >= 100) {
-            setStatus("success")
-            completionTimer = setTimeout(() => {
-              onComplete()
-            }, 1500)
-          }
-        }
-      })
-
-      // Combine unlisteners
-      unlisten = () => {
-        unlistenDuplication()
-        unlistenCreation()
-      }
-
-      // Fallback: If no progress events received after 2 seconds, log it
-      fallbackTimer = setTimeout(() => {
-        if (!hasRealProgress) {
-          console.log("No real progress events received after 2 seconds")
-        }
-      }, 2000)
-    }
-
-    setupListener()
-
-    return () => {
-      if (unlisten) {
-        unlisten()
-      }
-      if (completionTimer) {
-        clearTimeout(completionTimer)
-      }
-      if (fallbackTimer) {
-        clearTimeout(fallbackTimer)
-      }
-    }
-  }, [instanceName, onComplete, hasRealProgress])
-
-  // Fallback: Simulate progress if no real progress events are received
-  useEffect(() => {
-    if (status === "creating" && !hasRealProgress) {
-      const interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 90) return prev
-          return prev + Math.random() * 15
         })
-      }, 300)
 
-      // Simulate completion after 5 seconds if no real progress
-      const timer = setTimeout(() => {
-        setProgress(100)
-        setStatus("success")
-        setTimeout(() => {
-          onComplete()
-        }, 2000)
-      }, 5000)
+        // Listen for creation progress events
+        const unlistenCreation = await listen<ProgressPayload>("creation-progress", (event) => {
+          if (event.payload.instance === instanceName) {
+            console.log(`[ProgressToast] Creation progress: ${event.payload.progress}%`, event.payload.stage)
+            
+            setHasReceivedProgress(true)
+            setProgress(event.payload.progress)
+            
+            if (event.payload.stage) {
+              setStage(event.payload.stage)
+            }
+            
+            if (event.payload.progress >= 100 && !isCompletingRef.current) {
+              isCompletingRef.current = true
+              console.log(`[ProgressToast] Creation complete!`)
+              setStatus("success")
+              
+              if (completionTimerRef.current) {
+                clearTimeout(completionTimerRef.current)
+              }
+              
+              completionTimerRef.current = setTimeout(() => {
+                onComplete()
+              }, 1500)
+            }
+          }
+        })
 
-      return () => {
-        clearInterval(interval)
-        clearTimeout(timer)
+        // Listen for modpack installation progress events
+        const unlistenModpack = await listen<ProgressPayload>("modpack-install-progress", (event) => {
+          if (event.payload.instance === instanceName) {
+            console.log(`[ProgressToast] Modpack install progress: ${event.payload.progress}%`, event.payload.stage)
+            
+            setHasReceivedProgress(true)
+            setProgress(event.payload.progress)
+            
+            if (event.payload.stage) {
+              setStage(event.payload.stage)
+            }
+            
+            if (event.payload.progress >= 100 && !isCompletingRef.current) {
+              isCompletingRef.current = true
+              console.log(`[ProgressToast] Modpack install complete!`)
+              setStatus("success")
+              
+              if (completionTimerRef.current) {
+                clearTimeout(completionTimerRef.current)
+              }
+              
+              completionTimerRef.current = setTimeout(() => {
+                onComplete()
+              }, 1500)
+            }
+          }
+        })
+
+        // Store unlisten functions
+        unlistenFunctionsRef.current = [
+          unlistenDuplication,
+          unlistenCreation,
+          unlistenModpack
+        ]
+
+        console.log(`[ProgressToast] All listeners set up successfully`)
+
+        // Set up error timeout - if no progress after 15 seconds, show error
+        errorTimerRef.current = setTimeout(() => {
+          if (!isCompletingRef.current) {
+            console.error(`[ProgressToast] No progress events received after 15 seconds for ${instanceName}`)
+            setStatus("error")
+            setStage("Operation timed out - no progress received")
+            onError()
+          }
+        }, 15000)
+
+      } catch (error) {
+        console.error(`[ProgressToast] Failed to set up listeners:`, error)
+        setStatus("error")
+        setStage("Failed to initialize listeners")
+        onError()
       }
     }
-  }, [status, hasRealProgress, onComplete])
+
+    setupListeners()
+
+    // Cleanup function
+    return () => {
+      console.log(`[ProgressToast] Cleaning up listeners for ${instanceName}`)
+      
+      // Clear all timers
+      if (completionTimerRef.current) {
+        clearTimeout(completionTimerRef.current)
+      }
+      if (errorTimerRef.current) {
+        clearTimeout(errorTimerRef.current)
+      }
+      
+      // Unlisten from all events
+      unlistenFunctionsRef.current.forEach(unlisten => {
+        try {
+          unlisten()
+        } catch (error) {
+          console.error(`[ProgressToast] Error unlistening:`, error)
+        }
+      })
+      unlistenFunctionsRef.current = []
+    }
+  }, [instanceName, onComplete, onError])
 
   const getStatusColor = () => {
     switch (status) {
@@ -125,27 +186,51 @@ export function CreationProgressToast({ instanceName, onComplete, onDismiss }: C
     }
   }
 
+  const getStatusText = () => {
+    // If we have a stage, always show it
+    if (stage) return stage
+    
+    // Otherwise show status-based text
+    switch (status) {
+      case "creating":
+        return hasReceivedProgress ? "Processing..." : "Starting..."
+      case "success":
+        return "Complete!"
+      case "error":
+        return "Failed"
+    }
+  }
+
+  const handleDismiss = () => {
+    // Clear timers before dismissing
+    if (completionTimerRef.current) {
+      clearTimeout(completionTimerRef.current)
+    }
+    if (errorTimerRef.current) {
+      clearTimeout(errorTimerRef.current)
+    }
+    onDismiss()
+  }
+
   return (
-    <div className="fixed top-14 right-4 z-40 w-80 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg overflow-hidden animate-in slide-in-from-right-4 duration-300">
+    <div className="fixed top-14 right-4 z-40 w-80 bg-[#1a1a1a] rounded-lg overflow-hidden animate-in slide-in-from-right-4 duration-300">
       <div className="p-4">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-[#e8e8e8]">
-                    {status === "creating" && "Creating instance"}
-                    {status === "success" && "Instance created"}
-                    {status === "error" && "Creation failed"}
+                  <p className="text-sm font-medium text-[#e8e8e8] truncate">
+                    {getStatusText()}
                   </p>
                   {status === "creating" && (
-                    <Loader2 size={14} className="animate-spin text-[#16a34a]" />
+                    <Loader2 size={14} className="animate-spin text-[#16a34a] flex-shrink-0" />
                   )}
                   {status === "success" && (
-                    <CheckCircle2 size={16} className="text-[#16a34a]" />
+                    <CheckCircle2 size={16} className="text-[#16a34a] flex-shrink-0" />
                   )}
                   {status === "error" && (
-                    <XCircle size={16} className="text-red-500" />
+                    <XCircle size={16} className="text-red-500 flex-shrink-0" />
                   )}
                 </div>
                 <p className="text-xs text-[#808080] mt-0.5 truncate">{instanceName}</p>
@@ -158,8 +243,8 @@ export function CreationProgressToast({ instanceName, onComplete, onDismiss }: C
               
               {status !== "creating" && (
                 <button
-                  onClick={onDismiss}
-                  className="flex-shrink-0 p-1 hover:bg-[#2a2a2a] rounded transition-colors text-[#808080] hover:text-[#e8e8e8]"
+                  onClick={handleDismiss}
+                  className="flex-shrink-0 p-1 hover:bg-[#2a2a2a] rounded transition-colors text-[#808080] hover:text-[#e8e8e8] cursor-pointer"
                 >
                   <X size={14} />
                 </button>

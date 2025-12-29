@@ -77,12 +77,18 @@ pub async fn install_modpack(
             return Err("Invalid preferred game version format".to_string());
         }
     }
+
+    let _ = app_handle.emit("modpack-install-progress", serde_json::json!({
+        "instance": safe_name,
+        "progress": 0,
+        "stage": "Starting modpack installation..."
+    }));
     
     println!("Installing modpack: {}", modpack_slug);
     
     let _ = app_handle.emit("modpack-install-progress", serde_json::json!({
         "instance": safe_name,
-        "progress": 0,
+        "progress": 5,
         "stage": "Fetching modpack information..."
     }));
     
@@ -288,7 +294,7 @@ pub async fn install_modpack(
     
     let _ = std::fs::remove_file(&modpack_file);
     let _ = std::fs::remove_dir_all(&extract_dir);
-    
+
     let _ = app_handle.emit("modpack-install-progress", serde_json::json!({
         "instance": safe_name,
         "progress": 100,
@@ -472,12 +478,18 @@ pub async fn install_modpack_from_file(
             return Err("Invalid preferred game version format".to_string());
         }
     }
+
+    let _ = app_handle.emit("modpack-install-progress", serde_json::json!({
+        "instance": safe_name,
+        "progress": 0,
+        "stage": "Starting modpack installation..."
+    }));
     
     println!("Installing modpack from file: {}", file_path);
     
     let _ = app_handle.emit("modpack-install-progress", serde_json::json!({
         "instance": safe_name,
-        "progress": 0,
+        "progress": 5,
         "stage": "Reading modpack file..."
     }));
     
@@ -654,7 +666,7 @@ pub async fn install_modpack_from_file(
     }
     
     let _ = std::fs::remove_dir_all(&extract_dir);
-    
+
     let _ = app_handle.emit("modpack-install-progress", serde_json::json!({
         "instance": safe_name,
         "progress": 100,

@@ -865,6 +865,7 @@ function App() {
                   instances={instances}
                   onSetSelectedInstance={setSelectedInstance}
                   onRefreshInstances={loadInstances}
+                  onShowCreationToast={handleStartCreating}
                 />
               )}
 
