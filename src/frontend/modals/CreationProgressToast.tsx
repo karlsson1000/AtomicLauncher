@@ -17,8 +17,7 @@ interface ProgressPayload {
 }
 
 export function CreationProgressToast({ 
-  instanceName, 
-  onComplete, 
+  instanceName,
   onError,
   onDismiss 
 }: CreationProgressToastProps) {
@@ -32,6 +31,28 @@ export function CreationProgressToast({
   const completionTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const errorTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const unlistenFunctionsRef = useRef<Array<() => void>>([])
+  const onDismissRef = useRef(onDismiss)
+
+  useEffect(() => {
+    onDismissRef.current = onDismiss
+  }, [onDismiss])
+
+  // Auto-dismiss
+  useEffect(() => {
+    if (status === "success" || status === "error") {
+      console.log(`[ProgressToast] Setting up auto-dismiss timer for status: ${status}`)
+      
+      const timer = setTimeout(() => {
+        console.log(`[ProgressToast] Auto-dismissing after 5 seconds`)
+        onDismissRef.current()
+      }, 5000)
+
+      return () => {
+        console.log(`[ProgressToast] Clearing auto-dismiss timer`)
+        clearTimeout(timer)
+      }
+    }
+  }, [status])
 
   useEffect(() => {
     const setupListeners = async () => {
@@ -54,14 +75,6 @@ export function CreationProgressToast({
               isCompletingRef.current = true
               console.log(`[ProgressToast] Duplication complete!`)
               setStatus("success")
-              
-              if (completionTimerRef.current) {
-                clearTimeout(completionTimerRef.current)
-              }
-              
-              completionTimerRef.current = setTimeout(() => {
-                onComplete()
-              }, 1500)
             }
           }
         })
@@ -82,14 +95,6 @@ export function CreationProgressToast({
               isCompletingRef.current = true
               console.log(`[ProgressToast] Creation complete!`)
               setStatus("success")
-              
-              if (completionTimerRef.current) {
-                clearTimeout(completionTimerRef.current)
-              }
-              
-              completionTimerRef.current = setTimeout(() => {
-                onComplete()
-              }, 1500)
             }
           }
         })
@@ -110,14 +115,6 @@ export function CreationProgressToast({
               isCompletingRef.current = true
               console.log(`[ProgressToast] Modpack install complete!`)
               setStatus("success")
-              
-              if (completionTimerRef.current) {
-                clearTimeout(completionTimerRef.current)
-              }
-              
-              completionTimerRef.current = setTimeout(() => {
-                onComplete()
-              }, 1500)
             }
           }
         })
@@ -173,7 +170,7 @@ export function CreationProgressToast({
       })
       unlistenFunctionsRef.current = []
     }
-  }, [instanceName, onComplete, onError])
+  }, [instanceName, onError])
 
   const getStatusColor = () => {
     switch (status) {
@@ -202,13 +199,6 @@ export function CreationProgressToast({
   }
 
   const handleDismiss = () => {
-    // Clear timers before dismissing
-    if (completionTimerRef.current) {
-      clearTimeout(completionTimerRef.current)
-    }
-    if (errorTimerRef.current) {
-      clearTimeout(errorTimerRef.current)
-    }
     onDismiss()
   }
 
@@ -236,19 +226,21 @@ export function CreationProgressToast({
                 <p className="text-xs text-[#808080] mt-0.5 truncate">{instanceName}</p>
               </div>
               
-              {/* Percentage */}
-              <p className="text-xs text-[#4a4a4a] flex-shrink-0">
-                {Math.round(progress)}%
-              </p>
-              
-              {status !== "creating" && (
-                <button
-                  onClick={handleDismiss}
-                  className="flex-shrink-0 p-1 hover:bg-[#2a2a2a] rounded transition-colors text-[#808080] hover:text-[#e8e8e8] cursor-pointer"
-                >
-                  <X size={14} />
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {/* Percentage */}
+                <p className="text-xs text-[#4a4a4a] flex-shrink-0">
+                  {Math.round(progress)}%
+                </p>
+                
+                {status !== "creating" && (
+                  <button
+                    onClick={handleDismiss}
+                    className="flex-shrink-0 p-1 hover:bg-[#2a2a2a] rounded transition-colors text-[#808080] hover:text-[#e8e8e8] cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Progress bar */}
