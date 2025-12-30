@@ -58,11 +58,20 @@ export function HomeTab({
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
   const [loadingSnapshots, setLoadingSnapshots] = useState(true)
 
-  // Load icons for all instances
+  // Get only the 5 most recently played instances
+  const recentInstances = instances
+    .filter(instance => instance.last_played)
+    .sort((a, b) => {
+      const timeA = a.last_played ? new Date(a.last_played).getTime() : 0
+      const timeB = b.last_played ? new Date(b.last_played).getTime() : 0
+      return timeB - timeA
+    })
+    .slice(0, 5)
+
   useEffect(() => {
     const loadIcons = async () => {
       const icons: Record<string, string | null> = {}
-      for (const instance of instances) {
+      for (const instance of recentInstances) {
         try {
           const icon = await invoke<string | null>("get_instance_icon", {
             instanceName: instance.name
@@ -76,7 +85,7 @@ export function HomeTab({
       setInstanceIcons(icons)
     }
 
-    if (instances.length > 0) {
+    if (recentInstances.length > 0) {
       loadIcons()
     }
   }, [instances])
@@ -175,11 +184,11 @@ export function HomeTab({
 
         {/* Instances Section */}
         <div>
-          {instances.length === 0 ? (
+          {recentInstances.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-18">
               <Package size={48} className="text-[#16a34a] mb-3" strokeWidth={1.5} />
-              <h3 className="text-base font-semibold text-[#e8e8e8] mb-1">No instances yet</h3>
-              <p className="text-sm text-[#808080] mb-4">Create your first instance to get started</p>
+              <h3 className="text-base font-semibold text-[#e8e8e8] mb-1">No recently played instances</h3>
+              <p className="text-sm text-[#808080] mb-4">Launch an instance to see it here</p>
               <button
                 onClick={onCreateNew}
                 className="px-4 py-2 bg-[#16a34a] hover:bg-[#15803d] text-white rounded-lg font-medium text-sm flex items-center gap-2 transition-all cursor-pointer"
@@ -190,7 +199,7 @@ export function HomeTab({
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {instances.map((instance) => {
+              {recentInstances.map((instance) => {
                 const icon = instanceIcons[instance.name]
                 const isLaunching = launchingInstanceName === instance.name
                 return (
