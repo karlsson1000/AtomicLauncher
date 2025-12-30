@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { ModsTab, ModsSelector } from "./ModsTab"
 import { ModpacksTab } from "./ModpacksTab"
 import { FolderDown } from "lucide-react"
@@ -26,6 +26,7 @@ export function BrowseTab({
   onShowCreationToast 
 }: BrowseTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<"mods" | "modpacks">("mods")
+  const scrollContainerRef = useRef<HTMLDivElement>(null)  // ADD THIS
 
   const [selectedModpackVersion, setSelectedModpackVersion] = useState<string | null>(null)
   const [availableModpackVersions, setAvailableModpackVersions] = useState<string[]>([])
@@ -41,7 +42,7 @@ export function BrowseTab({
   }
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-6 space-y-4" ref={scrollContainerRef}>  {/* ADD ref HERE */}
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -91,6 +92,7 @@ export function BrowseTab({
           selectedInstance={selectedInstance}
           instances={instances}
           onSetSelectedInstance={onSetSelectedInstance}
+          scrollContainerRef={scrollContainerRef}
         />
       ) : (
         <ModpacksTab
@@ -104,6 +106,7 @@ export function BrowseTab({
           onSetIsLoadingVersions={setIsLoadingModpackVersions}
           onImport={handleImport}
           onShowCreationToast={onShowCreationToast}
+          scrollContainerRef={scrollContainerRef}
         />
       )}
     </div>

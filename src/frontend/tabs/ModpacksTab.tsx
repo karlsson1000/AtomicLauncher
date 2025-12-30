@@ -16,6 +16,7 @@ interface ModpacksTabProps {
   onSetIsLoadingVersions: (loading: boolean) => void
   onImport?: () => void
   onShowCreationToast?: (instanceName: string) => void
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>
 }
 
 interface ModpackInstallProgress {
@@ -37,7 +38,8 @@ export function ModpacksTab({
   isLoadingVersions,
   onSetIsLoadingVersions,
   onImport,
-  onShowCreationToast
+  onShowCreationToast,
+  scrollContainerRef
 }: ModpacksTabProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<ModrinthSearchResult | null>(null)
@@ -205,7 +207,11 @@ export function ModpacksTab({
   }
 
   const handlePageChange = (newPage: number) => {
+    if (scrollContainerRef?.current) {
+      scrollContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' })
+    
     setCurrentPage(newPage)
     setTimeout(() => handleSearch(newPage), 100)
   }
