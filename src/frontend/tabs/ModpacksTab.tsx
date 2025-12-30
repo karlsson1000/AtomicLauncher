@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react"
 import { invoke } from "@tauri-apps/api/core"
-import { listen } from "@tauri-apps/api/event"
 import { open } from '@tauri-apps/plugin-dialog'
 import { Search, Download, Loader2, Package, ChevronLeft, ChevronRight, CheckCircle, AlertCircle } from "lucide-react"
 import type { Instance, ModrinthSearchResult, ModrinthProject, ModrinthVersion } from "../../types"
@@ -17,12 +16,6 @@ interface ModpacksTabProps {
   onImport?: () => void
   onShowCreationToast?: (instanceName: string) => void
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>
-}
-
-interface ModpackInstallProgress {
-  instance: string
-  progress: number
-  stage: string
 }
 
 const YOUR_MODPACK_SLUG = "stellarmc-enhanced"
@@ -49,7 +42,6 @@ export function ModpacksTab({
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   const [installingModpacks, setInstallingModpacks] = useState<Set<string>>(new Set())
-  const [modpackProgress, setModpackProgress] = useState<Record<string, ModpackInstallProgress>>({})
   const [installationStatus, setInstallationStatus] = useState<Record<string, 'success' | 'error'>>({})
   const [selectedVersions, setSelectedVersions] = useState<Record<string, string>>({})
   const [modpackVersions, setModpackVersions] = useState<Record<string, ModrinthVersion[]>>({})
@@ -57,6 +49,7 @@ export function ModpacksTab({
   const [modpackGalleries, setModpackGalleries] = useState<Record<string, string[]>>({})
   const [showInstalledOnly, setShowInstalledOnly] = useState(false)
   const [customModpack, setCustomModpack] = useState<ModrinthProject | null>(null)
+  const [versionSearch, setVersionSearch] = useState("")
 
   useEffect(() => {
     if (onImport) {
@@ -68,21 +61,6 @@ export function ModpacksTab({
     loadCustomModpack()
     loadPopularModpacks()
     loadAvailableVersions()
-  }, [])
-
-  useEffect(() => {
-    const unlisten = listen<ModpackInstallProgress>('modpack-install-progress', (event) => {
-      const progress = event.payload
-      console.log("Modpack progress event:", progress)
-      setModpackProgress(prev => ({
-        ...prev,
-        [progress.instance]: progress
-      }))
-    })
-
-    return () => {
-      unlisten.then(fn => fn())
-    }
   }, [])
 
   useEffect(() => {
@@ -408,11 +386,6 @@ export function ModpacksTab({
           delete newStatus[modpack.project_id]
           return newStatus
         })
-        setModpackProgress(prev => {
-          const newProgress = { ...prev }
-          delete newProgress[instanceName]
-          return newProgress
-        })
       }, 3000)
 
     } catch (error) {
@@ -450,14 +423,12 @@ export function ModpacksTab({
       const filePath = selected as string
       
       try {
-        // Extract modpack name from the file
         const modpackName = await invoke<string>("get_modpack_name_from_file", {
           filePath: filePath
         })
         
         console.log("Extracted modpack name:", modpackName)
         
-        // Check if instance already exists and generate unique name if needed
         let finalName = modpackName
         const existingInstance = instances.find(
           i => i.name.toLowerCase() === modpackName.toLowerCase()
@@ -468,12 +439,10 @@ export function ModpacksTab({
           console.log("Instance exists, using name:", finalName)
         }
         
-        // Show toast notification
         if (onShowCreationToast) {
           onShowCreationToast(finalName)
         }
         
-        // Import directly without modal
         await invoke("install_modpack_from_file", {
           filePath: filePath,
           instanceName: finalName,
@@ -495,6 +464,18 @@ export function ModpacksTab({
       console.error("Failed to select modpack file:", error)
       alert(`Failed to select file: ${error}`)
     }
+  }
+
+  const getFilteredVersions = () => {
+    let filtered = availableVersions
+
+    if (versionSearch.trim()) {
+      filtered = filtered.filter(v => 
+        v.toLowerCase().includes(versionSearch.toLowerCase())
+      )
+    }
+
+    return filtered
   }
 
   const filteredModpacks = getFilteredModpacks()
@@ -530,7 +511,6 @@ export function ModpacksTab({
               {getPaginatedModpacks().map((modpack) => {
                 const isInstalling = installingModpacks.has(modpack.project_id)
                 const status = installationStatus[modpack.project_id]
-                const progress = modpackProgress[modpack.title]
                 const isLoadingVersionsForThis = loadingVersions.has(modpack.project_id)
                 const gallery = modpackGalleries[modpack.project_id] || []
                 const backgroundImage = gallery.length > 0 ? gallery[0] : modpack.icon_url
@@ -611,21 +591,6 @@ export function ModpacksTab({
                           )}
                         </button>
                       </div>
-
-                      {isInstalling && progress && (
-                        <div className="mt-2.5">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs text-white font-medium truncate drop-shadow-md">{progress.stage}</span>
-                            <span className="text-xs text-white/80 drop-shadow-md">{progress.progress}%</span>
-                          </div>
-                          <div className="w-full bg-black/40 rounded-full h-1.5 backdrop-blur-sm">
-                            <div
-                              className="bg-[#16a34a] h-1.5 rounded-full transition-all duration-300 shadow-lg"
-                              style={{ width: `${progress.progress}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )
@@ -729,41 +694,49 @@ export function ModpacksTab({
         )}
       </div>
 
-      <div className="w-64 flex-shrink-0">
-        <div className="sticky top-4">
+      <div className="w-56 flex-shrink-0">
+        <div className="sticky top-4 space-y-3">
           <div className="bg-[#1a1a1a] rounded-lg overflow-hidden">
-            <div className="px-4 pt-3 pb-2">
-              <h3 className="font-semibold text-[#e8e8e8] text-center">Filter by Version</h3>
-            </div>
-            
             <div className="p-3">
+              <h3 className="font-semibold text-[#e8e8e8] mb-3">Versions</h3>
               {isLoadingVersions ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 size={20} className="animate-spin text-[#16a34a]" />
                 </div>
               ) : availableVersions.length > 0 ? (
-                <div className="max-h-[calc(100vh-240px)] overflow-y-auto pr-1">
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {availableVersions.map((version) => (
+                <>
+                  <div className="relative mb-3">
+                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#4a4a4a]" strokeWidth={2} />
+                    <input
+                      type="text"
+                      placeholder="Search..."
+                      value={versionSearch}
+                      onChange={(e) => setVersionSearch(e.target.value)}
+                      className="w-full bg-[#0d0d0d] rounded-md pl-8 pr-3 py-2 text-sm text-[#e8e8e8] placeholder-[#4a4a4a] focus:outline-none focus:ring-1 focus:ring-[#2a2a2a] transition-all"
+                    />
+                  </div>
+
+                  <div className="max-h-[300px] overflow-y-auto space-y-1">
+                    {getFilteredVersions().map((version) => (
                       <button
                         key={version}
                         onClick={() => onSetSelectedVersion(version)}
-                        className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition-all cursor-pointer ${
                           selectedVersion === version
-                            ? "bg-[#16a34a] text-white"
-                            : "bg-[#0d0d0d] text-[#808080] hover:bg-[#1f1f1f] hover:text-[#e8e8e8]"
+                            ? "bg-[#2a2a2a] text-white font-medium"
+                            : "text-[#b0b0b0] hover:bg-[#0d0d0d] hover:text-[#e8e8e8]"
                         }`}
                       >
                         {version}
                       </button>
                     ))}
                   </div>
-                </div>
+                </>
               ) : null}
             </div>
           </div>
 
-          <div className="bg-[#1a1a1a] rounded-lg overflow-hidden mt-3">
+          <div className="bg-[#1a1a1a] rounded-lg overflow-hidden">
             <div className="p-3">
               <button
                 onClick={() => {
