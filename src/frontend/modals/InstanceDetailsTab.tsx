@@ -564,17 +564,21 @@ return (
                 <div className="flex gap-2">
                   <button
                     onClick={onLaunch}
-                    disabled={isLaunching || !isAuthenticated || isRenaming}
-                    className="px-6 py-2.5 bg-[#16a34a] hover:bg-[#15803d] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium text-sm flex items-center gap-2 transition-all shadow-lg cursor-pointer"
+                    disabled={!isAuthenticated || isRenaming}
+                    className={`px-6 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 transition-all cursor-pointer ${
+                      isLaunching
+                        ? "bg-red-500/10 text-red-400"
+                        : "bg-[#16a34a]/10 hover:bg-[#16a34a]/20 text-[#16a34a]"
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {isLaunching ? (
                       <>
-                        <Loader2 size={16} className="animate-spin" />
+                        <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
                         <span>Launching...</span>
                       </>
                     ) : (
                       <>
-                        <Play size={16} fill="currentColor" />
+                        <Play size={18} fill="currentColor" strokeWidth={0} />
                         <span>Play</span>
                       </>
                     )}
