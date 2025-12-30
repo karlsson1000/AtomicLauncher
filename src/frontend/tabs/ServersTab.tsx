@@ -1,4 +1,4 @@
-import { Server, Plus, Search, Trash2, Copy, RefreshCw } from "lucide-react"
+import { Server, Plus, Search, Trash2 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { CreateServerModal } from "../modals/CreateServerModal"
@@ -45,17 +45,31 @@ export function ServersTab({}: ServersTabProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedServer, setSelectedServer] = useState<ServerInfo | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
-  const [isRefreshing, setIsRefreshing] = useState<Set<string>>(new Set())
   const [serverToDelete, setServerToDelete] = useState<string | null>(null)
 
   useEffect(() => {
     loadServers()
   }, [])
 
+  // Auto-refresh all servers every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      servers.forEach(server => {
+        refreshServerStatus(server)
+      })
+    }, 5 * 60 * 1000) // 5 minutes
+
+    return () => clearInterval(interval)
+  }, [servers])
+
   const loadServers = async () => {
     try {
       const serverList = await invoke<ServerInfo[]>("get_servers")
       setServers(serverList)
+      // Refresh status for all servers on load
+      serverList.forEach(server => {
+        refreshServerStatus(server)
+      })
     } catch (error) {
       console.error("Failed to load servers:", error)
       setServers([])
@@ -95,9 +109,7 @@ export function ServersTab({}: ServersTabProps) {
     }
   }
 
-  const handleRefreshServer = async (server: ServerInfo) => {
-    setIsRefreshing(prev => new Set(prev).add(server.name))
-    
+  const refreshServerStatus = async (server: ServerInfo) => {
     try {
       const statusData = await fetchServerStatus(server.address, server.port)
       
@@ -126,12 +138,6 @@ export function ServersTab({}: ServersTabProps) {
       }
     } catch (error) {
       console.error("Failed to refresh server:", error)
-    } finally {
-      setIsRefreshing(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(server.name)
-        return newSet
-      })
     }
   }
 
@@ -149,13 +155,6 @@ export function ServersTab({}: ServersTabProps) {
     } finally {
       setServerToDelete(null)
     }
-  }
-
-  const handleCopyAddress = (server: ServerInfo) => {
-    const address = server.port === 25565 
-      ? server.address 
-      : `${server.address}:${server.port}`
-    navigator.clipboard.writeText(address)
   }
 
   const handleServerAdded = async (newServer: ServerInfo) => {
@@ -267,7 +266,6 @@ export function ServersTab({}: ServersTabProps) {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredServers.map((server) => {
-              const isRefreshingServer = isRefreshing.has(server.name)
               const displayAddress = server.port === 25565 
                 ? server.address 
                 : `${server.address}:${server.port}`
@@ -276,9 +274,20 @@ export function ServersTab({}: ServersTabProps) {
                 <div
                   key={server.name}
                   onClick={() => setSelectedServer(server)}
-                  className="bg-[#1a1a1a] rounded-xl p-4 cursor-pointer transition-all hover:ring-2 hover:ring-[#2a2a2a]"
+                  className="bg-[#1a1a1a] rounded-xl p-4 cursor-pointer transition-all hover:ring-2 hover:ring-[#2a2a2a] relative"
                 >
-                  <div className="flex gap-3 mb-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setServerToDelete(server.name)
+                    }}
+                    className="absolute top-4 right-4 px-3 py-2 bg-[#dc2626]/10 hover:bg-[#dc2626]/20 text-[#dc2626] rounded-lg text-xs font-medium transition-all cursor-pointer"
+                    title="Remove server"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+
+                  <div className="flex gap-3 mb-2 pr-10">
                     {server.favicon ? (
                       <img 
                         src={server.favicon} 
@@ -311,53 +320,19 @@ export function ServersTab({}: ServersTabProps) {
                   </div>
 
                   {server.motd && (
-                    <p className="text-xs text-[#808080] mb-2 line-clamp-2 leading-relaxed">
+                    <p className="text-xs text-[#808080] mb-2 truncate leading-relaxed">
                       {server.motd}
                     </p>
                   )}
 
                   {server.status === "online" && server.players_online !== undefined && (
-                    <div className="flex items-center justify-between mb-3 pb-3">
+                    <div className="flex items-center justify-between">
                       <span className="text-xs text-[#808080]">Players</span>
                       <span className="text-sm font-medium text-[#e8e8e8]">
                         {server.players_online.toLocaleString()} / {server.players_max?.toLocaleString()}
                       </span>
                     </div>
                   )}
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleRefreshServer(server)
-                      }}
-                      disabled={isRefreshingServer}
-                      className="flex-1 px-3 py-2 bg-[#2a2a2a] hover:bg-[#1f1f1f] text-[#e8e8e8] rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                    >
-                      <RefreshCw size={14} className={isRefreshingServer ? "animate-spin" : ""} />
-                      <span>Refresh</span>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleCopyAddress(server)
-                      }}
-                      className="px-3 py-2 bg-[#2a2a2a] hover:bg-[#1f1f1f] text-[#e8e8e8] rounded-lg text-xs font-medium transition-all cursor-pointer"
-                      title="Copy address"
-                    >
-                      <Copy size={14} />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setServerToDelete(server.name)
-                      }}
-                      className="px-3 py-2 bg-[#dc2626]/10 hover:bg-[#dc2626]/20 text-[#dc2626] rounded-lg text-xs font-medium transition-all cursor-pointer"
-                      title="Remove server"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
                 </div>
               )
             })}
