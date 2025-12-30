@@ -222,3 +222,75 @@ pub async fn detect_java_installations() -> Result<Vec<String>, String> {
     
     Ok(java_paths)
 }
+
+use base64::{engine::general_purpose, Engine as _};
+
+fn get_sidebar_bg_path() -> PathBuf {
+    crate::utils::get_launcher_dir().join("sidebar_bg.png")
+}
+
+#[tauri::command]
+pub async fn set_sidebar_background(image_data: String) -> Result<String, String> {
+    let sidebar_bg_path = get_sidebar_bg_path();
+    
+    // Extract base64 data
+    let base64_data = if let Some(comma_pos) = image_data.find(',') {
+        &image_data[comma_pos + 1..]
+    } else {
+        &image_data
+    };
+    
+    // Decode base64
+    let image_bytes = general_purpose::STANDARD
+        .decode(base64_data)
+        .map_err(|e| format!("Failed to decode image: {}", e))?;
+    
+    // Save to file
+    std::fs::write(&sidebar_bg_path, image_bytes)
+        .map_err(|e| format!("Failed to save image: {}", e))?;
+    
+    Ok("Background saved successfully".to_string())
+}
+
+#[tauri::command]
+pub async fn get_sidebar_background() -> Result<Option<String>, String> {
+    let sidebar_bg_path = get_sidebar_bg_path();
+    
+    if !sidebar_bg_path.exists() {
+        return Ok(None);
+    }
+    
+    // Read image file
+    let image_bytes = std::fs::read(&sidebar_bg_path)
+        .map_err(|e| format!("Failed to read image: {}", e))?;
+    
+    // Convert to base64
+    let base64_data = general_purpose::STANDARD.encode(&image_bytes);
+    
+    // Determine mime type based on file signature
+    let mime_type = if image_bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
+        "image/png"
+    } else if image_bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        "image/jpeg"
+    } else if image_bytes.starts_with(&[0x47, 0x49, 0x46]) {
+        "image/gif"
+    } else if image_bytes.starts_with(&[0x42, 0x4D]) {
+        "image/bmp"
+    } else {
+        "image/png"
+    };
+    
+    Ok(Some(format!("data:{};base64,{}", mime_type, base64_data)))
+}
+
+#[tauri::command]
+pub async fn remove_sidebar_background() -> Result<String, String> {
+    let sidebar_bg_path = get_sidebar_bg_path();
+    
+    if sidebar_bg_path.exists() {
+        std::fs::remove_file(&sidebar_bg_path)
+            .map_err(|e| format!("Failed to remove background: {}", e))?;
+    }
+    
+    Ok("Background removed successfully".to_string())
+}

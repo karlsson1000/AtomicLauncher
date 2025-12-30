@@ -79,7 +79,7 @@ input[type="range"]::-moz-range-thumb:hover {
   position: relative;
 }
 
-.sidebar-bg::before {
+.sidebar-bg:not([data-custom-bg])::before {
   content: '';
   position: absolute;
   top: 0;
@@ -95,7 +95,7 @@ input[type="range"]::-moz-range-thumb:hover {
   z-index: 0;
 }
 
-.sidebar-bg::after {
+.sidebar-bg:not([data-custom-bg])::after {
   content: '';
   position: absolute;
   top: 0;

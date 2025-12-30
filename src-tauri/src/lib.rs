@@ -71,6 +71,9 @@ use commands::{
     get_instance_settings,
     save_instance_settings,
     detect_java_installations,
+    set_sidebar_background,
+    get_sidebar_background,
+    remove_sidebar_background,
     
     // Template commands
     create_template,
@@ -185,6 +188,9 @@ pub fn run() {
             get_instance_settings,
             save_instance_settings,
             detect_java_installations,
+            set_sidebar_background,
+            get_sidebar_background,
+            remove_sidebar_background,
 
             // Mod Management
             get_installed_mods,

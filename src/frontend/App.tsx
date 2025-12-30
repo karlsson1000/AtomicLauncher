@@ -59,6 +59,7 @@ function App() {
   const [navigationHistory, setNavigationHistory] = useState<Array<{tab: typeof activeTab, showDetails: boolean, instance: Instance | null}>>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [isNavigating, setIsNavigating] = useState(false)
+  const [sidebarBackground, setSidebarBackground] = useState<string | null>(null)
 
   const appWindow = getCurrentWindow()
 
@@ -162,6 +163,7 @@ function App() {
     loadLauncherDirectory()
     loadSettings()
     loadAccounts()
+    loadSidebarBackground()
     const unlisten = listen<ConsoleLog>("console-log", (event) => {
       setConsoleLogs((prev) => [...prev, event.payload])
     })
@@ -241,6 +243,15 @@ function App() {
       setSettings(s)
     } catch (e) {
       console.error("Failed to load settings", e)
+    }
+  }
+
+  const loadSidebarBackground = async () => {
+    try {
+      const bg = await invoke<string | null>("get_sidebar_background")
+      setSidebarBackground(bg)
+    } catch (error) {
+      console.error("Failed to load sidebar background:", error)
     }
   }
 
@@ -517,8 +528,21 @@ function App() {
       )}
 
       <div className="flex flex-1 overflow-hidden mt-10">
-        <aside className="sidebar-bg w-58 bg-[#1a1a1a] flex flex-col">
-          <div className="flex-1 flex flex-col overflow-hidden">
+        <aside 
+          className="sidebar-bg w-58 bg-[#1a1a1a] flex flex-col relative"
+          data-custom-bg={sidebarBackground ? "true" : undefined}
+          style={{
+            backgroundImage: sidebarBackground 
+              ? `linear-gradient(to top, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.9)), url(${sidebarBackground})` 
+              : undefined,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: sidebarBackground ? 'repeat' : 'no-repeat',
+            backgroundColor: '#1a1a1a'
+          }}
+        >
+  
+        <div className="flex-1 flex flex-col overflow-hidden relative z-10">
             <nav className="flex-shrink-0 px-2 py-3 space-y-1">
               <button
                 onClick={() => {
@@ -675,7 +699,7 @@ function App() {
             )}
           </div>
 
-          <div className="p-2 space-y-1">
+          <div className="p-2 space-y-1 relative z-10">
             {isAuthenticated && activeAccount ? (
               <>
                 <div className="relative py-1 mb-0.5">
@@ -893,6 +917,7 @@ function App() {
                   settings={settings}
                   launcherDirectory={launcherDirectory}
                   onSettingsChange={setSettings}
+                  onBackgroundChanged={loadSidebarBackground}
                 />
               )}
             </>
