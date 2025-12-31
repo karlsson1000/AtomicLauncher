@@ -575,7 +575,7 @@ impl InstanceManager {
             .arg("--uuid")
             .arg(uuid)
             .arg("--accessToken")
-            .arg("${env:MINECRAFT_ACCESS_TOKEN}")
+            .arg(access_token)
             .arg("--version")
             .arg(&version)
             .arg("--gameDir")
@@ -584,9 +584,6 @@ impl InstanceManager {
             .arg(meta_dir.join("assets"))
             .arg("--assetIndex")
             .arg(&assets_id);
-
-        // Set access token as environment variable
-        cmd.env("MINECRAFT_ACCESS_TOKEN", access_token);
 
         cmd.current_dir(&instance_dir)
             .stdout(Stdio::piped())
