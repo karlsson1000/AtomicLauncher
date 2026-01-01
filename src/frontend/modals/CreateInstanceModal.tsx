@@ -102,17 +102,26 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
 
   useEffect(() => {
     if (loaderType === "fabric") {
+      // Force back to releases for Fabric and update version
       if (versionFilter === "snapshot") {
         setVersionFilter("release")
-      }
-      
-      if (versionFilter === "release" && !fabricSupportedVersions.includes(selectedVersion)) {
-        const firstSupported = allVersions.find(v => 
-          (v.type === "release" || v.type === "old_beta" || v.type === "old_alpha") && 
+        const releases = allVersions.filter(v => 
+          (v.type === "release" || v.type === "old_beta" || v.type === "old_alpha") &&
           fabricSupportedVersions.includes(v.id)
         )
-        if (firstSupported) {
-          setSelectedVersion(firstSupported.id)
+        if (releases.length > 0) {
+          setSelectedVersion(releases[0].id)
+        }
+      } else {
+        // Already on releases, but check if current version is supported
+        if (!fabricSupportedVersions.includes(selectedVersion)) {
+          const firstSupported = allVersions.find(v => 
+            (v.type === "release" || v.type === "old_beta" || v.type === "old_alpha") && 
+            fabricSupportedVersions.includes(v.id)
+          )
+          if (firstSupported) {
+            setSelectedVersion(firstSupported.id)
+          }
         }
       }
       
@@ -317,8 +326,18 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
                   type="button"
                   onClick={() => {
                     setVersionFilter("release")
-                    const firstRelease = filteredVersions.find(v => v.type === "release" || v.type === "old_beta" || v.type === "old_alpha")
-                    if (firstRelease) setSelectedVersion(firstRelease.id)
+                    // Calculate releases immediately with the new filter
+                    const releases = allVersions.filter(v => 
+                      v.type === "release" || v.type === "old_beta" || v.type === "old_alpha"
+                    )
+                    // If Fabric is enabled, filter to supported versions
+                    const availableReleases = loaderType === "fabric" 
+                      ? releases.filter(v => fabricSupportedVersions.includes(v.id))
+                      : releases
+                    
+                    if (availableReleases.length > 0) {
+                      setSelectedVersion(availableReleases[0].id)
+                    }
                   }}
                   className={`px-6 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                     versionFilter === "release"
@@ -333,8 +352,11 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
                   onClick={() => {
                     if (loaderType === "fabric") return
                     setVersionFilter("snapshot")
-                    const firstSnapshot = filteredVersions.find(v => v.type === "snapshot")
-                    if (firstSnapshot) setSelectedVersion(firstSnapshot.id)
+                    // Calculate snapshots immediately with the new filter
+                    const snapshots = allVersions.filter(v => v.type === "snapshot")
+                    if (snapshots.length > 0) {
+                      setSelectedVersion(snapshots[0].id)
+                    }
                   }}
                   disabled={loaderType === "fabric"}
                   className={`px-6 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
