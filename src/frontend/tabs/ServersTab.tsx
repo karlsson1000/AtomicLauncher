@@ -98,7 +98,7 @@ export function ServersTab({}: ServersTabProps) {
         status: data.online ? "online" : "offline",
         players_online: data.players?.online,
         players_max: data.players?.max,
-        version: data.protocol?.name || data.version,
+        version: data.version || data.protocol?.name,
         motd: data.motd?.clean?.join('\n'),
         favicon: data.icon ? `https://api.mcsrvstat.us/icon/${fullAddress}` : undefined,
         last_checked: Date.now()
