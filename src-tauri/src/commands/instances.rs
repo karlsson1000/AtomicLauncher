@@ -795,3 +795,75 @@ fn calculate_dir_size(path: &std::path::Path) -> std::io::Result<u64> {
     
     Ok(size)
 }
+
+#[tauri::command]
+pub async fn update_instance_fabric_loader(
+    instance_name: String,
+    fabric_version: String,
+) -> Result<String, String> {
+    let safe_name = sanitize_instance_name(&instance_name)?;
+    
+    if !fabric_version.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-') {
+        return Err("Invalid fabric version format".to_string());
+    }
+    
+    let instance_dir = get_instance_dir(&safe_name);
+    
+    if !instance_dir.exists() {
+        return Err(format!("Instance '{}' does not exist", safe_name));
+    }
+    
+    // Load instance metadata
+    let instance_json_path = instance_dir.join("instance.json");
+    let content = std::fs::read_to_string(&instance_json_path)
+        .map_err(|e| format!("Failed to read instance.json: {}", e))?;
+    
+    let mut instance: Instance = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse instance.json: {}", e))?;
+    
+    // Verify this is a Fabric instance
+    if instance.loader != Some("fabric".to_string()) {
+        return Err("This instance is not using Fabric loader".to_string());
+    }
+    
+    // Get the Minecraft version (need to extract from the fabric version string)
+    let minecraft_version = if instance.version.contains("fabric-loader") {
+        // Extract Minecraft version from fabric version string
+        // Format: fabric-loader-X.X.X-1.XX.X -> 1.XX.X
+        let parts: Vec<&str> = instance.version.split('-').collect();
+        if let Some(mc_version) = parts.last() {
+            mc_version.to_string()
+        } else {
+            return Err("Could not determine Minecraft version from instance".to_string());
+        }
+    } else {
+        instance.version.clone()
+    };
+    
+    println!("Updating Fabric loader for instance '{}'", safe_name);
+    println!("Minecraft version: {}", minecraft_version);
+    println!("New Fabric version: {}", fabric_version);
+    
+    // Install the new Fabric version
+    let meta_dir = get_meta_dir();
+    let fabric_installer = FabricInstaller::new(meta_dir);
+    
+    let new_fabric_version_id = fabric_installer
+        .install_fabric(&minecraft_version, &fabric_version)
+        .await
+        .map_err(|e| format!("Failed to install Fabric: {}", e))?;
+    
+    println!("✓ Installed Fabric version: {}", new_fabric_version_id);
+    
+    // Update instance metadata
+    instance.version = new_fabric_version_id;
+    instance.loader_version = Some(fabric_version);
+    
+    let updated_json = serde_json::to_string_pretty(&instance)
+        .map_err(|e| format!("Failed to serialize instance.json: {}", e))?;
+    
+    std::fs::write(&instance_json_path, updated_json)
+        .map_err(|e| format!("Failed to write instance.json: {}", e))?;
+    
+    Ok(format!("Successfully updated Fabric loader to version {}", instance.loader_version.as_deref().unwrap_or("unknown")))
+}

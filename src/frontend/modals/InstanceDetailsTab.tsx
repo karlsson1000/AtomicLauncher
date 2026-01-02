@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from "react"
-import { Play, FolderOpen, Trash2, Package, Loader2, ExternalLink, Edit2, X, Check, ImagePlus, Camera, Globe } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Play, FolderOpen, Package, Loader2, ExternalLink, Globe, Settings, Trash2 } from "lucide-react"
 import { invoke } from "@tauri-apps/api/core"
 import { ConfirmModal, AlertModal } from "./ConfirmModal"
+import { InstanceSettingsModal } from "./InstanceSettingsModal"
 import type { Instance } from "../../types"
 
 interface InstalledMod {
@@ -43,17 +44,12 @@ export function InstanceDetailsTab({
   onBack,
   onInstanceUpdated,
 }: InstanceDetailsTabProps) {
-  const [isDeleting, setIsDeleting] = useState(false)
   const [installedMods, setInstalledMods] = useState<InstalledMod[]>([])
   const [worlds, setWorlds] = useState<World[]>([])
   const [isLoadingMods, setIsLoadingMods] = useState(true)
   const [isLoadingWorlds, setIsLoadingWorlds] = useState(true)
-  const [isRenaming, setIsRenaming] = useState(false)
-  const [newName, setNewName] = useState(instance.name)
-  const [renameError, setRenameError] = useState<string | null>(null)
   const [instanceIcon, setInstanceIcon] = useState<string | null>(null)
-  const [isUploadingIcon, setIsUploadingIcon] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean
     title: string
@@ -73,6 +69,10 @@ export function InstanceDetailsTab({
     loadWorlds()
     loadInstanceIcon()
   }, [instance.name])
+
+  useEffect(() => {
+    loadInstanceIcon()
+  }, [instance])
 
   const loadInstanceIcon = async () => {
     try {
@@ -101,72 +101,6 @@ export function InstanceDetailsTab({
     }
   }
 
-  const handleIconClick = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleIconChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    if (!file.type.startsWith('image/')) {
-      setAlertModal({
-        isOpen: true,
-        title: "Invalid File",
-        message: "Please select an image file (PNG, JPEG, or WebP)",
-        type: "danger"
-      })
-      return
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setAlertModal({
-        isOpen: true,
-        title: "File Too Large",
-        message: "Image must be smaller than 5MB",
-        type: "danger"
-      })
-      return
-    }
-
-    setIsUploadingIcon(true)
-
-    try {
-      const reader = new FileReader()
-      reader.onload = async () => {
-        const base64 = (reader.result as string).split(',')[1]
-        
-        try {
-          await invoke("set_instance_icon", {
-            instanceName: instance.name,
-            imageData: base64
-          })
-          
-          await loadInstanceIcon()
-          onInstanceUpdated()
-        } catch (error) {
-          console.error("Failed to set icon:", error)
-          setAlertModal({
-            isOpen: true,
-            title: "Error",
-            message: `Failed to set icon: ${error}`,
-            type: "danger"
-          })
-        } finally {
-          setIsUploadingIcon(false)
-        }
-      }
-      reader.readAsDataURL(file)
-    } catch (error) {
-      console.error("Failed to read file:", error)
-      setIsUploadingIcon(false)
-    }
-
-    if (event.target) {
-      event.target.value = ''
-    }
-  }
-
   const loadInstalledMods = async () => {
     setIsLoadingMods(true)
     try {
@@ -180,42 +114,49 @@ export function InstanceDetailsTab({
           const actualFilename = isDisabled ? mod.filename.replace('.disabled', '') : mod.filename
           
           try {
-            let slug = actualFilename.replace(/\.jar$/i, '')
+            let slug = actualFilename
+              .replace(/\.jar$/i, '')
+              .toLowerCase()
             
             slug = slug
-              .replace(/[-_](\d+\.)+\d+[-_+].*$/i, '')
-              .replace(/[-_](\d+\.)+\d+$/i, '')
-              .replace(/[-_]mc(\d+\.)+\d+$/i, '')
-              .replace(/[-_]forge$/i, '')
-              .replace(/[-_]fabric$/i, '')
+              .replace(/[-_]((\d+\.)+\d+)[-_+]?.*$/i, '')
+              .replace(/[-_]v?((\d+\.)+\d+)$/i, '')
+              .replace(/[-_]mc((\d+\.)+\d+)$/i, '')
+              .replace(/[-_](forge|fabric|quilt|neoforge)$/i, '')
+              .replace(/[-_]\d+$/i, '')
+              .trim()
+            
+            if (!slug) {
+              return { ...mod, disabled: isDisabled }
+            }
             
             const facets = JSON.stringify([["project_type:mod"]])
-            const result = await invoke<any>("search_mods", {
+            let result = await invoke<any>("search_mods", {
               query: slug,
               facets,
               index: "relevance",
               offset: 0,
-              limit: 5,
+              limit: 20,
             })
             
             if (result.hits && result.hits.length > 0) {
-              const slugLower = slug.toLowerCase()
-              const bestMatch = result.hits.find((hit: any) => 
-                hit.slug.toLowerCase() === slugLower ||
-                hit.title.toLowerCase() === slugLower
-              ) || result.hits.find((hit: any) => 
-                hit.slug.toLowerCase().includes(slugLower) ||
-                slugLower.includes(hit.slug.toLowerCase())
-              ) || result.hits[0]
+              const slugNormalized = slug.replace(/[-_\s]/g, '').toLowerCase()
+              let bestMatch = result.hits.find((hit: any) => {
+                const hitSlug = hit.slug.toLowerCase().replace(/[-_\s]/g, '')
+                const hitTitle = hit.title.toLowerCase().replace(/[-_\s]/g, '')
+                return hitSlug === slugNormalized || hitTitle === slugNormalized
+              })
               
-              return {
-                ...mod,
-                disabled: isDisabled,
-                name: bestMatch.title,
-                description: bestMatch.description,
-                icon_url: bestMatch.icon_url,
-                downloads: bestMatch.downloads,
-                author: bestMatch.author,
+              if (bestMatch) {
+                return {
+                  ...mod,
+                  disabled: isDisabled,
+                  name: bestMatch.title,
+                  description: bestMatch.description,
+                  icon_url: bestMatch.icon_url,
+                  downloads: bestMatch.downloads,
+                  author: bestMatch.author,
+                }
               }
             }
           } catch (error) {
@@ -256,7 +197,7 @@ export function InstanceDetailsTab({
     const minutes = String(date.getMinutes()).padStart(2, '0')
     const ampm = hours >= 12 ? 'PM' : 'AM'
     hours = hours % 12
-    hours = hours ? hours : 12 // the hour '0' should be '12'
+    hours = hours ? hours : 12
     
     return `${year}-${month}-${day} at ${hours}:${minutes} ${ampm}`
   }
@@ -269,40 +210,22 @@ export function InstanceDetailsTab({
     return instance.version
   }
 
+  const getFabricLoaderVersion = (instance: Instance): string | null => {
+    if (instance.loader === "fabric") {
+      const parts = instance.version.split('-')
+      if (parts.length >= 2) {
+        return parts[parts.length - 2]
+      }
+    }
+    return null
+  }
+
   const handleOpenFolder = async () => {
     try {
       await invoke("open_instance_folder", { instanceName: instance.name })
     } catch (error) {
       console.error("Failed to open folder:", error)
     }
-  }
-
-  const handleDelete = async () => {
-    setConfirmModal({
-      isOpen: true,
-      title: "Delete Instance",
-      message: `Are you sure you want to delete "${instance.name}"?\n\nThis action cannot be undone.`,
-      type: "danger",
-      onConfirm: async () => {
-        setIsDeleting(true)
-        setConfirmModal(null)
-        try {
-          await invoke("delete_instance", { instanceName: instance.name })
-          onBack()
-          onInstanceUpdated()
-        } catch (error) {
-          console.error("Failed to delete instance:", error)
-          setAlertModal({
-            isOpen: true,
-            title: "Error",
-            message: `Failed to delete instance: ${error}`,
-            type: "danger"
-          })
-        } finally {
-          setIsDeleting(false)
-        }
-      }
-    })
   }
 
   const handleDeleteMod = async (filename: string) => {
@@ -378,10 +301,8 @@ export function InstanceDetailsTab({
   }
 
   const handleOpenWorldsFolder = async () => {
-    console.log("Attempting to open worlds folder for instance:", instance.name)
     try {
-      const result = await invoke("open_worlds_folder", { instanceName: instance.name })
-      console.log("Open worlds folder result:", result)
+      await invoke("open_worlds_folder", { instanceName: instance.name })
     } catch (error) {
       console.error("Failed to open worlds folder:", error)
       setAlertModal({
@@ -394,13 +315,11 @@ export function InstanceDetailsTab({
   }
 
   const handleOpenWorldFolder = async (folderName: string) => {
-    console.log("Attempting to open world folder:", folderName, "for instance:", instance.name)
     try {
-      const result = await invoke("open_world_folder", {
+      await invoke("open_world_folder", {
         instanceName: instance.name,
         folderName
       })
-      console.log("Open world folder result:", result)
     } catch (error) {
       console.error("Failed to open world folder:", error)
       setAlertModal({
@@ -412,150 +331,53 @@ export function InstanceDetailsTab({
     }
   }
 
-  const startRename = () => {
-    setIsRenaming(true)
-    setNewName(instance.name)
-    setRenameError(null)
+  const handleInstanceUpdated = () => {
+    loadInstanceIcon()
+    onInstanceUpdated()
   }
 
-  const cancelRename = () => {
-    setIsRenaming(false)
-    setNewName(instance.name)
-    setRenameError(null)
+  const handleInstanceDeleted = () => {
+    onBack()
+    onInstanceUpdated()
   }
 
-  const handleRename = async () => {
-    const trimmedName = newName.trim()
-    
-    if (!trimmedName) {
-      setRenameError("Instance name cannot be empty")
-      return
-    }
+  const fabricLoaderVersion = getFabricLoaderVersion(instance)
 
-    if (trimmedName === instance.name) {
-      cancelRename()
-      return
-    }
-
-    try {
-      await invoke("rename_instance", {
-        oldName: instance.name,
-        newName: trimmedName
-      })
-      setIsRenaming(false)
-      setRenameError(null)
-      onInstanceUpdated()
-    } catch (error) {
-      setRenameError(error as string)
-    }
-  }
-
-  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleRename()
-    } else if (e.key === "Escape") {
-      cancelRename()
-    }
-  }
-
-return (
+  return (
     <>
       <div className="p-6 space-y-4">
         <div className="max-w-7xl mx-auto">
-          {/* Header with Icon */}
           <div className="flex items-start gap-4 mb-6">
-            {/* Instance Icon */}
-            <div className="relative group flex-shrink-0">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleIconChange}
-                className="hidden"
-              />
-              
+            <div className="flex-shrink-0">
               {instanceIcon ? (
-                <button
-                  onClick={handleIconClick}
-                  disabled={isUploadingIcon}
-                  className="w-16 h-16 rounded-xl overflow-hidden relative cursor-pointer bg-transparent"
-                >
+                <div className="w-16 h-16 rounded-xl overflow-hidden">
                   <img
                     src={instanceIcon}
                     alt={instance.name}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Camera size={20} className="text-white" />
-                  </div>
-                </button>
+                </div>
               ) : (
-                <button
-                  onClick={handleIconClick}
-                  disabled={isUploadingIcon}
-                  className="w-16 h-16 border-2 border-dashed border-[#2a2a2a] hover:border-[#16a34a]/50 rounded-xl flex items-center justify-center transition-all bg-transparent cursor-pointer"
-                  title="Add icon"
-                >
-                  {isUploadingIcon ? (
-                    <Loader2 size={24} className="text-[#16a34a] animate-spin" />
-                  ) : (
-                    <ImagePlus size={24} className="text-[#4a4a4a] group-hover:text-[#16a34a] transition-colors" />
-                  )}
-                </button>
+                <div className="w-16 h-16 border-2 border-dashed border-[#2a2a2a] rounded-xl flex items-center justify-center bg-transparent">
+                  <Package size={24} className="text-[#4a4a4a]" />
+                </div>
               )}
             </div>
 
-            {/* Instance Info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    {isRenaming ? (
-                      <>
-                        <input
-                          type="text"
-                          value={newName}
-                          onChange={(e) => setNewName(e.target.value)}
-                          onKeyDown={handleRenameKeyDown}
-                          className="text-2xl font-semibold text-[#e8e8e8] tracking-tight bg-transparent border-none px-0 py-0 focus:outline-none w-48 mr-1"
-                          autoFocus
-                        />
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={handleRename}
-                            className="p-1.5 bg-[#16a34a] hover:bg-[#15803d] text-white rounded-md transition-colors cursor-pointer"
-                          >
-                            <Check size={16} />
-                          </button>
-                          <button
-                            onClick={cancelRename}
-                            className="p-1.5 bg-[#1a1a1a] hover:bg-[#1f1f1f] text-[#808080] hover:text-[#e8e8e8] rounded-md transition-colors cursor-pointer"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <h1 className="text-2xl font-semibold text-[#e8e8e8] tracking-tight">{instance.name}</h1>
-                        <button
-                          onClick={startRename}
-                          className="p-1.5 hover:bg-[#1a1a1a] text-[#808080] hover:text-[#e8e8e8] rounded-md transition-colors cursor-pointer"
-                          title="Rename instance"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  {renameError && (
-                    <p className="text-sm text-red-400 mt-1">{renameError}</p>
-                  )}
+                  <h1 className="text-2xl font-semibold text-[#e8e8e8] tracking-tight">{instance.name}</h1>
                   <p className="text-sm text-[#808080] mt-0.5">
                     Minecraft {getMinecraftVersion(instance)}
                     {" • "}
                     {instance.loader === "fabric" ? (
-                      <span className="text-[#3b82f6]">Fabric Loader</span>
+                      <>
+                        <span className="text-[#3b82f6]">Fabric Loader</span>
+                        {fabricLoaderVersion && (
+                          <span className="text-[#808080]"> {fabricLoaderVersion}</span>
+                        )}
+                      </>
                     ) : (
                       <span className="text-[#16a34a]">Vanilla</span>
                     )}
@@ -564,7 +386,7 @@ return (
                 <div className="flex gap-2">
                   <button
                     onClick={onLaunch}
-                    disabled={!isAuthenticated || isRenaming}
+                    disabled={!isAuthenticated}
                     className={`px-6 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 transition-all cursor-pointer ${
                       isLaunching
                         ? "bg-red-500/10 text-red-400"
@@ -585,26 +407,17 @@ return (
                   </button>
                   <button
                     onClick={handleOpenFolder}
-                    disabled={isRenaming}
-                    className="px-4 py-2.5 bg-[#1a1a1a] hover:bg-[#1f1f1f] text-[#e8e8e8] rounded-lg font-medium text-sm flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+                    className="px-4 py-2.5 bg-[#1a1a1a] hover:bg-[#1f1f1f] text-[#e8e8e8] rounded-lg font-medium text-sm flex items-center gap-2 transition-all cursor-pointer"
                   >
                     <FolderOpen size={16} />
                     <span>Open Folder</span>
                   </button>
                   <button
-                    onClick={handleDelete}
-                    disabled={isDeleting || isRenaming}
-                    className="px-4 py-2.5 bg-[#1a1a1a] hover:bg-[#1f1f1f] text-[#808080] hover:text-red-400 rounded-lg font-medium text-sm flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+                    onClick={() => setIsSettingsOpen(true)}
+                    className="px-4 py-2.5 bg-[#1a1a1a] hover:bg-[#1f1f1f] text-[#e8e8e8] rounded-lg font-medium text-sm flex items-center gap-2 transition-all cursor-pointer"
+                    title="Instance Settings"
                   >
-                    {isDeleting ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 size={16} />
-                      </>
-                    )}
+                    <Settings size={18} />
                   </button>
                 </div>
               </div>
@@ -613,9 +426,7 @@ return (
 
           <div className="border-t border-[#2a2a2a] my-6"></div>
 
-          {/* Two Column Layout for Mods and Worlds */}
           <div className="grid grid-cols-2 gap-0 relative">
-            {/* Mods Section */}
             <div className="pr-6 border-r border-[#2a2a2a]">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -704,7 +515,6 @@ return (
               )}
             </div>
 
-            {/* Worlds Section */}
             <div className="pl-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -796,6 +606,15 @@ return (
           </div>
         </div>
       </div>
+
+      <InstanceSettingsModal
+        isOpen={isSettingsOpen}
+        instance={instance}
+        instanceIcon={instanceIcon}
+        onClose={() => setIsSettingsOpen(false)}
+        onInstanceUpdated={handleInstanceUpdated}
+        onInstanceDeleted={handleInstanceDeleted}
+      />
 
       {confirmModal && (
         <ConfirmModal
