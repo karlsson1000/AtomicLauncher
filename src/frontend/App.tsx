@@ -178,11 +178,24 @@ function App() {
         newSet.delete(event.payload.instance)
         return newSet
       })
+
+      setLaunchingInstanceName(null)
+    })
+    
+    // Listen for server instance launching
+    const unlistenServerLaunch = listen<{ instance: string, server: string }>("server-instance-launching", (event) => {
+      console.log(`Server launch detected: ${event.payload.instance} connecting to ${event.payload.server}`)
+      setLaunchingInstanceName(event.payload.instance)
+      setConsoleLogs([])
+      setActiveTab("console")
+      // Mark instance as running immediately
+      setRunningInstances((prev) => new Set(prev).add(event.payload.instance))
     })
     
     return () => {
       unlistenConsole.then((fn) => fn())
       unlistenExit.then((fn) => fn())
+      unlistenServerLaunch.then((fn) => fn())
     }
   }, [isReady])
 
@@ -940,7 +953,10 @@ function App() {
               )}
 
               {activeTab === "servers" && (
-                <ServersTab />
+                <ServersTab 
+                  launchingInstanceName={launchingInstanceName}
+                  runningInstances={runningInstances}
+                />
               )}
 
               {activeTab === "skins" && (

@@ -1,4 +1,4 @@
-import { Server, Plus, Search, Trash2 } from "lucide-react"
+import { Server, Plus, Search, Trash2, Play, Loader2 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { CreateServerModal } from "../modals/CreateServerModal"
@@ -38,14 +38,18 @@ interface McSrvStatResponse {
 }
 
 interface ServersTabProps {
+  launchingInstanceName: string | null
+  runningInstances: Set<string>
 }
 
-export function ServersTab({}: ServersTabProps) {
+export function ServersTab({ runningInstances }: ServersTabProps) {
   const [servers, setServers] = useState<ServerInfo[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedServer, setSelectedServer] = useState<ServerInfo | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [serverToDelete, setServerToDelete] = useState<string | null>(null)
+  const [launchingServer, setLaunchingServer] = useState<string | null>(null)
+  const isAnyInstanceRunning = runningInstances.size > 0
 
   useEffect(() => {
     loadServers()
@@ -193,6 +197,33 @@ export function ServersTab({}: ServersTabProps) {
     }
   }
 
+  const handleLaunchServer = async (server: ServerInfo, e: React.MouseEvent) => {
+    e.stopPropagation()
+    
+    if (server.status !== "online") {
+      alert("Server is not online!")
+      return
+    }
+
+    setLaunchingServer(server.name)
+
+    try {
+      await invoke("launch_server", {
+        serverAddress: server.address,
+        serverPort: server.port,
+        serverName: server.name
+      })
+
+      setTimeout(() => {
+        setLaunchingServer(null)
+      }, 1000)
+    } catch (error) {
+      console.error("Failed to launch server:", error)
+      alert(`Failed to launch: ${error}`)
+      setLaunchingServer(null)
+    }
+  }
+
   const filteredServers = servers.filter(server =>
     server.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     server.address.toLowerCase().includes(searchQuery.toLowerCase())
@@ -269,6 +300,8 @@ export function ServersTab({}: ServersTabProps) {
                 ? server.address 
                 : `${server.address}:${server.port}`
               
+              const isLaunching = launchingServer === server.name
+              
               return (
                 <div
                   key={server.name}
@@ -325,13 +358,42 @@ export function ServersTab({}: ServersTabProps) {
                   )}
 
                   {server.status === "online" && server.players_online !== undefined && (
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-3">
                       <span className="text-xs text-[#808080]">Players</span>
                       <span className="text-sm font-medium text-[#e8e8e8]">
                         {server.players_online.toLocaleString()} / {server.players_max?.toLocaleString()}
                       </span>
                     </div>
                   )}
+
+                  <button
+                    onClick={(e) => handleLaunchServer(server, e)}
+                    disabled={server.status !== "online" || isLaunching || isAnyInstanceRunning}
+                    className={`w-full py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all ${
+                      isAnyInstanceRunning
+                        ? "bg-red-500/10 text-red-400 cursor-not-allowed"
+                        : server.status === "online" && !isLaunching
+                        ? "bg-[#16a34a] hover:bg-[#15803d] text-white cursor-pointer shadow-lg"
+                        : "bg-[#2a2a2a] text-[#808080] cursor-not-allowed"
+                    }`}
+                  >
+                    {isAnyInstanceRunning ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Instance Running</span>
+                      </>
+                    ) : isLaunching ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Launching...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play size={16} strokeWidth={2} />
+                        <span>Play</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               )
             })}

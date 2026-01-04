@@ -180,6 +180,7 @@ impl InstanceManager {
         8
     }
 
+    // Regular launch
     pub fn launch(
         instance_name: &str,
         username: &str,
@@ -187,7 +188,34 @@ impl InstanceManager {
         access_token: &str,
         app_handle: tauri::AppHandle,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        Self::launch_internal(instance_name, username, uuid, access_token, None, app_handle)
+    }
+
+    // Launch with server connection
+    pub fn launch_with_server(
+        instance_name: &str,
+        username: &str,
+        uuid: &str,
+        access_token: &str,
+        server_address: &str,
+        app_handle: tauri::AppHandle,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Self::launch_internal(instance_name, username, uuid, access_token, Some(server_address), app_handle)
+    }
+
+    // Internal launch method with optional server connection
+    fn launch_internal(
+        instance_name: &str,
+        username: &str,
+        uuid: &str,
+        access_token: &str,
+        server_address: Option<&str>,
+        app_handle: tauri::AppHandle,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         println!("=== Launching Instance: {} ===", instance_name);
+        if let Some(server) = server_address {
+            println!("Server connection: {}", server);
+        }
 
         let meta_dir = get_meta_dir();
         let instance_dir = get_instance_dir(instance_name);
@@ -663,6 +691,71 @@ impl InstanceManager {
             .arg("--assetIndex")
             .arg(&assets_id);
 
+        // Add server connection arguments if provided
+        if let Some(server) = server_address {
+            // Parse version to determine which argument to use
+            let use_quickplay = should_use_quickplay(&base_version_id);
+            
+            if use_quickplay {
+                println!("Adding server connection: --quickPlayMultiplayer {}", server);
+                cmd.arg("--quickPlayMultiplayer").arg(server);
+            } else {
+                println!("Adding server connection: --server {}", server);
+                cmd.arg("--server").arg(server);
+            }
+        }
+
+        fn should_use_quickplay(version: &str) -> bool {
+            // Extract base version from fabric versions
+            let base_version = if version.contains("fabric-loader") {
+                // For Fabric
+                version.split('-').last().unwrap_or(version)
+            } else if version.contains('-') {
+                // For other loaders
+                version.split('-').next().unwrap_or(version)
+            } else {
+                version
+            };
+            
+            println!("Checking version for quickplay: {} (extracted from: {})", base_version, version);
+            
+            // Parse version
+            let parts: Vec<&str> = base_version.split('.').collect();
+            
+            if parts.len() >= 3 {
+                if let (Ok(major), Ok(minor), Ok(patch)) = 
+                    (parts[0].parse::<u32>(), parts[1].parse::<u32>(), parts[2].parse::<u32>()) 
+                {
+                    if major == 1 && minor == 20 && patch >= 5 {
+                        println!("Version {}.{}.{} >= 1.20.5, using --quickPlayMultiplayer", major, minor, patch);
+                        return true;
+                    }
+                    if major == 1 && minor > 20 {
+                        println!("Version {}.{}.{} > 1.20, using --quickPlayMultiplayer", major, minor, patch);
+                        return true;
+                    }
+                    if major > 1 {
+                        println!("Version {}.{}.{} > 1.x, using --quickPlayMultiplayer", major, minor, patch);
+                        return true;
+                    }
+                }
+            } else if parts.len() == 2 {
+                if let (Ok(major), Ok(minor)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+                    if major == 1 && minor > 20 {
+                        println!("Version {}.{} > 1.20, using --quickPlayMultiplayer", major, minor);
+                        return true;
+                    }
+                    if major > 1 {
+                        println!("Version {}.{} > 1.x, using --quickPlayMultiplayer", major, minor);
+                        return true;
+                    }
+                }
+            }
+            
+            println!("Version {} < 1.20.5, using --server", base_version);
+            false
+        }
+
         cmd.current_dir(&instance_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -684,8 +777,6 @@ impl InstanceManager {
             let mut processes = crate::commands::instances::RUNNING_PROCESSES.lock().unwrap();
             processes.insert(instance_name.to_string(), child_pid);
         }
-
-        println!("✓ Minecraft process started (PID: {:?})", child.id());
 
         // Capture stdout
         if let Some(stdout) = child.stdout.take() {
