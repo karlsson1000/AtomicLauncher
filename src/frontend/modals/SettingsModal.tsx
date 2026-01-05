@@ -257,7 +257,7 @@ export function SettingsModal({
             <div className="flex items-center gap-3">
               {appVersion && (
                 <span className="bg-[#0d0d0d] px-3 py-1.5 rounded text-sm text-[#808080]">
-                  v{appVersion}
+                  Build {appVersion.split('-')[1] || appVersion}
                 </span>
               )}
               <button
