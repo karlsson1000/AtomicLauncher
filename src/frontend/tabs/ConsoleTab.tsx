@@ -82,80 +82,12 @@ export function ConsoleTab({ consoleLogs, onClearConsole }: ConsoleTabProps) {
   return (
     <div className="p-6 space-y-4">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-[#e8e8e8] tracking-tight">Console</h1>
-            <p className="text-sm text-[#808080] mt-0.5">View game output and logs</p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleUploadToMcLogs}
-              disabled={consoleLogs.length === 0 || uploadState.loading}
-              className="px-4 py-2 bg-[#1a1a1a] hover:bg-[#1f1f1f] text-[#e8e8e8] rounded-lg font-medium text-sm flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Upload logs to mclo.gs"
-            >
-              {uploadState.loading ? (
-                <Loader2 size={16} strokeWidth={2} className="animate-spin" />
-              ) : (
-                <Upload size={16} strokeWidth={2} />
-              )}
-              <span>{uploadState.loading ? 'Uploading...' : 'Upload to mclo.gs'}</span>
-            </button>
-            <button
-              onClick={onClearConsole}
-              disabled={consoleLogs.length === 0}
-              className="px-4 py-2 bg-[#1a1a1a] hover:bg-[#1f1f1f] text-[#e8e8e8] rounded-lg font-medium text-sm flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Trash2 size={16} strokeWidth={2} />
-              <span>Clear</span>
-            </button>
-          </div>
+        <div className="mb-4">
+          <h1 className="text-2xl font-semibold text-[#e8e8e8] tracking-tight">Console</h1>
+          <p className="text-sm text-[#808080] mt-0.5">View game output and logs</p>
         </div>
 
-        {/* Upload Success/Error Notification */}
-        {(uploadState.url || uploadState.error) && (
-          <div className={`mb-4 p-4 rounded-lg ${
-            uploadState.url 
-              ? 'bg-[#1a1a1a] ring-1 ring-[#16a34a]/30' 
-              : 'bg-[#1a1a1a] ring-1 ring-red-500/30'
-          } flex items-center justify-between`}>
-            <div className="flex items-center gap-3 flex-1">
-              {uploadState.url ? (
-                <div className="flex items-center gap-3 flex-1">
-                  <p className="text-sm font-medium text-[#16a34a]">Logs uploaded successfully!</p>
-                  <a 
-                    href={uploadState.url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-sm text-[#e8e8e8] hover:text-[#16a34a] underline flex items-center gap-1 transition-colors"
-                  >
-                    {uploadState.url}
-                    <ExternalLink size={14} />
-                  </a>
-                  <button
-                    onClick={handleCopyUrl}
-                    className="text-xs px-2 py-1 bg-[#0d0d0d] hover:bg-[#16a34a]/20 text-[#e8e8e8] rounded transition-colors cursor-pointer"
-                  >
-                    Copy Link
-                  </button>
-                </div>
-              ) : (
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-red-400">Upload failed</p>
-                  <p className="text-xs text-red-300 mt-0.5">{uploadState.error}</p>
-                </div>
-              )}
-            </div>
-            <button
-              onClick={closeUploadNotification}
-              className="text-[#808080] hover:text-[#e8e8e8] transition-colors cursor-pointer"
-            >
-              <X size={18} />
-            </button>
-          </div>
-        )}
-
-        <div className="bg-[#101010] rounded-xl overflow-hidden" style={{ height: 'calc(100vh - 240px)' }}>
+        <div className="bg-[#101010] rounded-md overflow-hidden" style={{ height: 'calc(100vh - 280px)' }}>
           {consoleLogs.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
@@ -190,6 +122,73 @@ export function ConsoleTab({ consoleLogs, onClearConsole }: ConsoleTabProps) {
               <div ref={consoleEndRef} />
             </div>
           )}
+        </div>
+
+        <div className="flex items-center justify-end mt-4">
+          {/* Upload Success/Error Notification */}
+          {(uploadState.url || uploadState.error) && (
+            <div className={`flex-1 mr-4 p-1.5 rounded ${
+              uploadState.url
+            } flex items-center justify-between`}>
+              <div className="flex items-center gap-3 flex-1">
+                {uploadState.url ? (
+                  <div className="flex items-center gap-3 flex-1">
+                    <p className="text-sm font-medium text-[#16a34a]">Logs uploaded successfully!</p>
+                    <a 
+                      href={uploadState.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-sm text-[#e8e8e8] hover:text-[#16a34a] underline flex items-center gap-1 transition-colors"
+                    >
+                      {uploadState.url}
+                      <ExternalLink size={14} />
+                    </a>
+                    <button
+                      onClick={handleCopyUrl}
+                      className="text-xs px-2 py-1 bg-[#0d0d0d] hover:bg-[#16a34a]/20 text-[#e8e8e8] rounded transition-colors cursor-pointer"
+                    >
+                      Copy Link
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-red-400">Upload failed</p>
+                    <p className="text-xs text-red-300 mt-0.5">{uploadState.error}</p>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={closeUploadNotification}
+                className="text-[#808080] hover:text-[#e8e8e8] transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          )}
+
+          <div className="flex gap-2 flex-shrink-0">
+            <button
+              onClick={handleUploadToMcLogs}
+              disabled={consoleLogs.length === 0 || uploadState.loading}
+              className="px-4 py-2 bg-[#1a1a1a] hover:bg-[#1f1f1f] text-[#e8e8e8] rounded font-medium text-sm flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Upload logs to mclo.gs"
+            >
+              {uploadState.loading ? (
+                <Loader2 size={16} strokeWidth={2} className="animate-spin" />
+              ) : (
+                <Upload size={16} strokeWidth={2} />
+              )}
+              <span>{uploadState.loading ? 'Uploading...' : 'Upload to mclo.gs'}</span>
+            </button>
+            <button
+              onClick={onClearConsole}
+              disabled={consoleLogs.length === 0}
+              className="px-4 py-2 bg-[#1a1a1a] hover:bg-[#1f1f1f] text-[#e8e8e8] rounded font-medium text-sm flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Trash2 size={16} strokeWidth={2} />
+              <span>Clear</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
