@@ -133,50 +133,85 @@ impl InstanceManager {
         
         let version_text = String::from_utf8_lossy(&output.stderr);
         
-        // Parse version from output
-        if let Some(version_line) = version_text.lines().next() {
-            if let Some(major) = version_line
-                .split('"')
-                .nth(1)
-                .and_then(|v| v.split('.').next())
-                .and_then(|v| v.parse::<u32>().ok())
-            {
-                return Ok(major);
+        // Try multiple parsing strategies
+        for line in version_text.lines() {
+            // Strategy 1: Modern format - openjdk 17.0.8 or java version "17.0.8"
+            if let Some(captures) = line.split('"').nth(1) {
+                if let Some(major) = Self::parse_major_version(captures) {
+                    return Ok(major);
+                }
+            }
+            
+            // Strategy 2: Simple format - openjdk 21
+            if line.starts_with("openjdk") || line.starts_with("java") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    if let Some(major) = Self::parse_major_version(parts[1]) {
+                        return Ok(major);
+                    }
+                }
             }
         }
         
-        Err("Could not parse Java version".into())
+        Err("Could not parse Java version from output".into())
+    }
+
+    fn parse_major_version(version_str: &str) -> Option<u32> {
+        let parts: Vec<&str> = version_str.split('.').collect();
+        
+        if parts.is_empty() {
+            return None;
+        }
+        
+        // Handle old format: 1.8.0_xxx -> 8
+        if parts[0] == "1" && parts.len() > 1 {
+            parts[1].parse::<u32>().ok()
+        } else {
+            // Handle modern format: 17.0.8 -> 17
+            parts[0].parse::<u32>().ok()
+        }
     }
 
     fn get_required_java_version(minecraft_version: &str) -> u32 {
-        // Extract base Minecraft version
         let base_version = if let Some(pos) = minecraft_version.find('-') {
             &minecraft_version[..pos]
         } else {
             minecraft_version
         };
 
-        // Parse version components
         let parts: Vec<&str> = base_version.split('.').collect();
         
-        if parts.len() >= 2 {
-            if let (Ok(major), Ok(minor)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
-                if major == 1 && minor >= 20 {
-                    if parts.len() >= 3 {
-                        if let Ok(patch) = parts[2].parse::<u32>() {
-                            if minor == 20 && patch >= 5 {
-                                return 21;
-                            }
-                        }
-                    }
-                    return 17;
-                }
-                if major == 1 && minor >= 18 {
-                    return 17;
+        // New format: 26.x (snapshots after version naming change)
+        if parts.len() >= 1 {
+            if let Ok(major) = parts[0].parse::<u32>() {
+                if major >= 26 {
+                    return 25; // Minecraft 26+ requires Java 25
                 }
             }
         }
         
+        // Old format: 1.x.y
+        if parts.len() >= 2 {
+            if let (Ok(major), Ok(minor)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+                if major == 1 {
+                    // Check patch version for 1.20.5+
+                    if minor == 20 && parts.len() >= 3 {
+                        if let Ok(patch) = parts[2].parse::<u32>() {
+                            if patch >= 5 {
+                                return 21; // 1.20.5+ requires Java 21
+                            }
+                        }
+                    }
+                    
+                    // Version-specific requirements
+                    if minor >= 20 { return 17; } // 1.20-1.20.4 requires Java 17
+                    if minor >= 18 { return 17; } // 1.18+ requires Java 17
+                    if minor >= 17 { return 16; } // 1.17+ requires Java 16
+                    if minor >= 16 { return 8; }  // 1.16 works with Java 8
+                }
+            }
+        }
+
         8
     }
 
@@ -291,9 +326,20 @@ impl InstanceManager {
                 }
             }
             Err(e) => {
-                let warning = format!("Could not detect Java version ({}). Proceeding anyway, but launch may fail if Java is incompatible.", e);
-                println!("Warning: {}", warning);
-                Self::emit_error_log(&app_handle, instance_name, &format!("WARNING: {}", warning));
+                // Make this a hard error for critical versions
+                if required_java >= 17 {
+                    let err_msg = format!(
+                        "Could not detect Java version: {}. Minecraft {} requires Java {} or higher. Please ensure Java is correctly installed.",
+                        e, version, required_java
+                    );
+                    Self::emit_error_log(&app_handle, instance_name, &err_msg);
+                    return Err(err_msg.into());
+                } else {
+                    // Only warn for older versions
+                    let warning = format!("Could not detect Java version ({}). Proceeding with caution...", e);
+                    println!("Warning: {}", warning);
+                    Self::emit_error_log(&app_handle, instance_name, &format!("WARNING: {}", warning));
+                }
             }
         }
 
