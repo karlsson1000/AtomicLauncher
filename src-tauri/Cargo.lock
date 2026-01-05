@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "AtomicLauncher"
-version = "3.5.0"
+version = "26.1.5"
 dependencies = [
  "base64 0.22.1",
  "chrono",

@@ -1,6 +1,6 @@
 [package]
 name = "AtomicLauncher"
-version = "3.5.0"
+version = "26.1.5"
 description = "A Minecraft Launcher"
 authors = ["karlsson1000"]
 edition = "2021"

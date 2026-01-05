@@ -128,7 +128,7 @@ async fn frontend_ready(app: AppHandle) {
 
 #[tauri::command]
 fn get_app_version() -> String {
-    env!("CARGO_PKG_VERSION").to_string()
+    include_str!("../commit_hash.txt").trim().to_string()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

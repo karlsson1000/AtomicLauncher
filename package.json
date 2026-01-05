@@ -1,13 +1,14 @@
 {
   "name": "atomic-launcher",
   "private": true,
-  "version": "3.5.0",
+  "version": "4.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "node scripts/get-version.cjs && tauri",
+    "tauri:build": "node scripts/get-version.cjs && tauri build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
