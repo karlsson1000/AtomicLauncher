@@ -1,4 +1,4 @@
-import { Server, Plus, Search, Trash2, Play, Loader2 } from "lucide-react"
+import { Server, Plus, Search, Trash2, Play } from "lucide-react"
 import { useState, useEffect } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { CreateServerModal } from "../modals/CreateServerModal"
@@ -306,7 +306,7 @@ export function ServersTab({ runningInstances }: ServersTabProps) {
                 <div
                   key={server.name}
                   onClick={() => setSelectedServer(server)}
-                  className="bg-[#1a1a1a] rounded-md p-4 cursor-pointer transition-all hover:ring-2 hover:ring-[#2a2a2a] relative"
+                  className="group bg-[#1a1a1a] rounded-md p-4 cursor-pointer transition-all hover:ring-2 hover:ring-[#2a2a2a] relative"
                 >
                   <button
                     onClick={(e) => {
@@ -372,27 +372,21 @@ export function ServersTab({ runningInstances }: ServersTabProps) {
                     className={`w-full py-2.5 rounded font-medium text-sm flex items-center justify-center gap-2 transition-all ${
                       isAnyInstanceRunning
                         ? "bg-red-500/10 text-red-400 cursor-not-allowed"
-                        : server.status === "online" && !isLaunching
-                        ? "bg-[#16a34a] hover:bg-[#15803d] text-white cursor-pointer shadow-lg"
+                        : isLaunching
+                        ? "bg-red-500/10 text-red-400 cursor-not-allowed"
+                        : server.status === "online"
+                        ? "bg-[#16a34a]/10 hover:bg-[#16a34a]/20 text-[#16a34a] cursor-pointer"
                         : "bg-[#2a2a2a] text-[#808080] cursor-not-allowed"
                     }`}
                   >
-                    {isAnyInstanceRunning ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        <span>Instance Running</span>
-                      </>
-                    ) : isLaunching ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        <span>Launching...</span>
-                      </>
+                    {isAnyInstanceRunning || isLaunching ? (
+                      <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
                     ) : (
-                      <>
-                        <Play size={16} strokeWidth={2} />
-                        <span>Play</span>
-                      </>
+                      <Play size={16} fill="currentColor" strokeWidth={0} />
                     )}
+                    <span>
+                      {isAnyInstanceRunning ? "Instance Running" : isLaunching ? "Launching..." : "Play"}
+                    </span>
                   </button>
                 </div>
               )
