@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import * as skinview3d from "skinview3d"
-import { Upload, RotateCcw, Loader2, HatGlasses } from "lucide-react"
+import { Upload, RotateCcw, Loader2, HatGlasses, ChevronDown } from "lucide-react"
 
 interface SkinsTabProps {
   activeAccount?: { uuid: string; username: string } | null
@@ -9,6 +9,12 @@ interface SkinsTabProps {
 }
 
 interface CachedSkin {
+  url: string
+  variant: "classic" | "slim"
+  timestamp: number
+}
+
+interface RecentSkin {
   url: string
   variant: "classic" | "slim"
   timestamp: number
@@ -35,8 +41,65 @@ export function SkinsTab(props: SkinsTabProps) {
   const [capes, setCapes] = useState<Cape[]>([])
   const [activeCape, setActiveCape] = useState<string | null>(null)
   const [loadingCapes, setLoadingCapes] = useState(false)
+  const [recentSkins, setRecentSkins] = useState<RecentSkin[]>([])
+  const [capesExpanded, setCapesExpanded] = useState(false)
   const skinCacheRef = useRef<Map<string, CachedSkin>>(new Map())
   const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
+  // Load recent skins from persistent storage on mount
+  useEffect(() => {
+    if (!activeAccount || !invoke) {
+      setRecentSkins([])
+      return
+    }
+    
+    loadRecentSkins()
+  }, [activeAccount, invoke])
+
+  // Load recent skins from Tauri storage
+  const loadRecentSkins = async () => {
+    if (!activeAccount || !invoke) return
+    
+    try {
+      const result = await invoke("load_recent_skins", { 
+        accountUuid: activeAccount.uuid 
+      })
+      
+      if (result && Array.isArray(result)) {
+        setRecentSkins(result)
+      } else {
+        setRecentSkins([])
+      }
+    } catch (err) {
+      console.error("Failed to load recent skins:", err)
+      setRecentSkins([])
+    }
+  }
+
+  // Save a skin to recent skins
+  const addToRecentSkins = async (url: string, variant: "classic" | "slim") => {
+    if (!activeAccount || !invoke) return
+    
+    try {
+      // Create the new recent skin entry
+      const newSkin: RecentSkin = { url, variant, timestamp: Date.now() }
+      
+      // Update local state optimistically
+      setRecentSkins(prev => {
+        const filtered = prev.filter(s => s.url !== url)
+        return [newSkin, ...filtered].slice(0, 3)
+      })
+      
+      // Save to persistent storage
+      await invoke("save_recent_skin", {
+        accountUuid: activeAccount.uuid,
+        skinUrl: url,
+        variant: variant
+      })
+    } catch (err) {
+      console.error("Failed to save recent skin:", err)
+    }
+  }
 
   useEffect(() => {
     if (!canvasRef.current) return
@@ -94,7 +157,6 @@ export function SkinsTab(props: SkinsTabProps) {
   }, [viewerRef.current])
 
   const getCapeImageName = (alias: string) => {
-    // Handle special cases
     const specialCases: Record<string, string> = {
       "follower's": "followers",
       "purple heart": "purple",
@@ -120,15 +182,14 @@ export function SkinsTab(props: SkinsTabProps) {
       setLoading(true)
       setError(null)
       
-      // Check cache first
       const cacheKey = activeAccount.uuid
       const cached = skinCacheRef.current.get(cacheKey)
       const now = Date.now()
       
       if (cached && (now - cached.timestamp) < CACHE_DURATION) {
-        // Use cached skin
-        await viewer.loadSkin(cached.url)
-        viewer.playerObject.skin.slim = cached.variant === "slim"
+        await viewer.loadSkin(cached.url, {
+          model: cached.variant === "slim" ? "slim" : "default"
+        })
         setSkinVariant(cached.variant)
         viewer.render()
         setLoading(false)
@@ -139,13 +200,13 @@ export function SkinsTab(props: SkinsTabProps) {
       const skinData = await invoke("get_current_skin")
       
       if (skinData && skinData.url) {
-        await viewer.loadSkin(skinData.url)
-        
         const variant = skinData.variant === "slim" ? "slim" : "classic"
-        viewer.playerObject.skin.slim = variant === "slim"
+        await viewer.loadSkin(skinData.url, {
+          model: variant === "slim" ? "slim" : "default"
+        })
+        
         setSkinVariant(variant)
         
-        // Cache the skin data
         skinCacheRef.current.set(cacheKey, {
           url: skinData.url,
           variant: variant,
@@ -159,7 +220,6 @@ export function SkinsTab(props: SkinsTabProps) {
         const defaultSkinUrl = `https://cravatar.eu/avatar/${activeAccount.username}/128.png`
         await viewer.loadSkin(defaultSkinUrl)
         
-        // Cache default skin
         skinCacheRef.current.set(cacheKey, {
           url: defaultSkinUrl,
           variant: "classic",
@@ -218,11 +278,9 @@ export function SkinsTab(props: SkinsTabProps) {
     if (!viewerRef.current || !invoke) return
 
     try {
-      // Update 3D viewer
       await viewerRef.current.loadCape(capeUrl)
       viewerRef.current.render()
       
-      // Equip cape on Minecraft servers
       await invoke("equip_cape", { capeId })
       
       setActiveCape(capeId)
@@ -236,11 +294,9 @@ export function SkinsTab(props: SkinsTabProps) {
     if (!viewerRef.current || !invoke) return
     
     try {
-      // Remove from 3D viewer
       viewerRef.current.loadCape(null)
       viewerRef.current.render()
       
-      // Remove cape on Minecraft servers
       await invoke("remove_cape")
       
       setActiveCape(null)
@@ -268,12 +324,17 @@ export function SkinsTab(props: SkinsTabProps) {
           variant: skinVariant
         })
 
-        // Invalidate cache for this account
         if (activeAccount) {
           skinCacheRef.current.delete(activeAccount.uuid)
         }
 
         await loadUserSkin(viewerRef.current)
+        
+        // Add to recent skins after successful upload
+        const skinData = await invoke("get_current_skin")
+        if (skinData && skinData.url) {
+          await addToRecentSkins(skinData.url, skinData.variant === "slim" ? "slim" : "classic")
+        }
         
         setError(null)
       } catch (err) {
@@ -295,7 +356,6 @@ export function SkinsTab(props: SkinsTabProps) {
     try {
       await invoke("reset_skin")
       
-      // Invalidate cache for this account
       if (activeAccount) {
         skinCacheRef.current.delete(activeAccount.uuid)
       }
@@ -305,6 +365,51 @@ export function SkinsTab(props: SkinsTabProps) {
       setError(`Reset failed: ${err}`)
     } finally {
       setResetting(false)
+    }
+  }
+
+  const handleRecentSkinSelect = async (skin: RecentSkin) => {
+    if (!viewerRef.current || !invoke) return
+
+    setUploading(true)
+    setError(null)
+
+    try {
+      // Download the skin image
+      const response = await fetch(skin.url)
+      const blob = await response.blob()
+      
+      // Convert to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = reader.result as string
+          resolve(result.split(',')[1])
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+
+      // Upload the skin
+      await invoke("upload_skin", {
+        skinData: base64,
+        variant: skin.variant
+      })
+
+      if (activeAccount) {
+        skinCacheRef.current.delete(activeAccount.uuid)
+      }
+
+      await loadUserSkin(viewerRef.current)
+      
+      // Move to top of recent skins
+      await addToRecentSkins(skin.url, skin.variant)
+      
+      setError(null)
+    } catch (err) {
+      setError(`Failed to apply skin: ${err}`)
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -371,13 +476,16 @@ export function SkinsTab(props: SkinsTabProps) {
                   onClick={() => {
                     setSkinVariant("classic")
                     if (viewerRef.current) {
-                      viewerRef.current.playerObject.skin.slim = false
+                      const currentSkinUrl = viewerRef.current.skinCanvas?.source?.img?.src
+                      if (currentSkinUrl) {
+                        viewerRef.current.loadSkin(currentSkinUrl, { model: "default" })
+                      }
                       viewerRef.current.render()
                     }
                   }}
                   className={`flex-1 px-4 py-2.5 rounded text-sm font-medium transition-all cursor-pointer ${
                     skinVariant === "classic"
-                      ? "bg-[#16a34a] text-white"
+                      ? "bg-[#4572e3] text-white"
                       : "bg-[#0d0d0d] text-[#808080] hover:bg-[#1f1f1f] hover:text-[#e8e8e8]"
                   }`}
                 >
@@ -387,13 +495,16 @@ export function SkinsTab(props: SkinsTabProps) {
                   onClick={() => {
                     setSkinVariant("slim")
                     if (viewerRef.current) {
-                      viewerRef.current.playerObject.skin.slim = true
+                      const currentSkinUrl = viewerRef.current.skinCanvas?.source?.img?.src
+                      if (currentSkinUrl) {
+                        viewerRef.current.loadSkin(currentSkinUrl, { model: "slim" })
+                      }
                       viewerRef.current.render()
                     }
                   }}
                   className={`flex-1 px-4 py-2.5 rounded text-sm font-medium transition-all cursor-pointer ${
                     skinVariant === "slim"
-                      ? "bg-[#16a34a] text-white"
+                      ? "bg-[#4572e3] text-white"
                       : "bg-[#0d0d0d] text-[#808080] hover:bg-[#1f1f1f] hover:text-[#e8e8e8]"
                   }`}
                 >
@@ -448,54 +559,105 @@ export function SkinsTab(props: SkinsTabProps) {
               </div>
             </div>
 
-            {/* Capes Section */}
-            <div className="bg-[#1a1a1a] rounded-md p-5">
-              <h3 className="text-base font-semibold text-[#e8e8e8] mb-4">Capes</h3>
-              
-              {loadingCapes ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 size={24} className="animate-spin text-[#16a34a]" />
+            {/* Recent Skins */}
+            {recentSkins.length > 0 && (
+              <div className="bg-[#1a1a1a] rounded-md p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <h3 className="text-base font-semibold text-[#e8e8e8]">Recent Skins</h3>
                 </div>
-              ) : capes.length > 0 ? (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-4 gap-2">
-                    {capes.map((cape) => (
+                
+                <div className="flex gap-3">
+                  {recentSkins.map((skin, index) => {
+                    // Extract texture hash from URL
+                    const match = skin.url.match(/texture\/([a-f0-9]+)/)
+                    const hash = match ? match[1] : null
+                    // Use head avatar
+                    const renderUrl = hash ? `https://mc-heads.net/avatar/${hash}/128` : skin.url
+                    
+                    return (
                       <button
-                        key={cape.id}
-                        onClick={() => handleCapeSelect(cape.url, cape.id)}
-                        className={`w-20 h-32 bg-[#0d0d0d] rounded overflow-hidden flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-[#16a34a] ${
-                          activeCape === cape.id
-                            ? "ring-2 ring-[#16a34a]"
-                            : ""
-                        }`}
-                        title={cape.alias}
+                        key={`${skin.url}-${index}`}
+                        onClick={() => handleRecentSkinSelect(skin)}
+                        disabled={uploading}
+                        className="bg-[#0d0d0d] rounded hover:ring-2 hover:ring-[#4572e3] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer overflow-hidden"
                       >
-                        <img 
-                          src={`/capes/${getCapeImageName(cape.alias)}.png`}
-                          alt={cape.alias}
-                          className="w-full h-full object-contain"
+                        <img
+                          src={renderUrl}
+                          alt="Recent skin"
+                          className="w-16 h-16"
                           style={{ imageRendering: 'pixelated' }}
-                          onError={(e) => {
-                            e.currentTarget.src = '/logo.png'
-                          }}
                         />
                       </button>
-                    ))}
-                  </div>
-                  
-                  {activeCape && (
-                    <button
-                      onClick={handleCapeRemove}
-                      className="w-full px-3 py-2.5 bg-[#0d0d0d] hover:bg-[#1f1f1f] text-[#808080] hover:text-[#e8e8e8] rounded text-sm font-medium transition-all cursor-pointer"
-                    >
-                      Remove Cape
-                    </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Capes Section */}
+            <div className="bg-[#1a1a1a] rounded-md p-5">
+              <button
+                onClick={() => setCapesExpanded(!capesExpanded)}
+                className="w-full flex items-center justify-between cursor-pointer group"
+              >
+                <h3 className="text-base font-semibold text-[#e8e8e8]">Capes</h3>
+                <ChevronDown 
+                  size={20}
+                  strokeWidth={3}
+                  className={`text-[#808080] group-hover:text-[#e8e8e8] transition-all ${
+                    capesExpanded ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+              
+              {capesExpanded && (
+                <div className="mt-4">
+                  {loadingCapes ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 size={24} className="animate-spin text-[#16a34a]" />
+                    </div>
+                  ) : capes.length > 0 ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-4 gap-2">
+                        {capes.map((cape) => (
+                          <button
+                            key={cape.id}
+                            onClick={() => handleCapeSelect(cape.url, cape.id)}
+                            className={`w-20 h-32 bg-[#0d0d0d] rounded overflow-hidden flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-[#4572e3] ${
+                              activeCape === cape.id
+                                ? "ring-2 ring-[#4572e3]"
+                                : ""
+                            }`}
+                            title={cape.alias}
+                          >
+                            <img 
+                              src={`/capes/${getCapeImageName(cape.alias)}.png`}
+                              alt={cape.alias}
+                              className="w-full h-full object-contain"
+                              style={{ imageRendering: 'pixelated' }}
+                              onError={(e) => {
+                                e.currentTarget.src = '/logo.png'
+                              }}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                      
+                      {activeCape && (
+                        <button
+                          onClick={handleCapeRemove}
+                          className="w-full px-3 py-2.5 bg-[#0d0d0d] hover:bg-[#1f1f1f] text-[#808080] hover:text-[#e8e8e8] rounded text-sm font-medium transition-all cursor-pointer"
+                        >
+                          Remove Cape
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-[#808080] text-center py-4">
+                      No capes available
+                    </p>
                   )}
                 </div>
-              ) : (
-                <p className="text-sm text-[#808080] text-center py-4">
-                  No capes available
-                </p>
               )}
             </div>
             

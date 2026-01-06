@@ -105,6 +105,8 @@ use commands::{
     get_user_capes,
     equip_cape,
     remove_cape,
+    load_recent_skins,
+    save_recent_skin,
     
     // System commands
     get_system_info,
@@ -155,6 +157,8 @@ pub fn run() {
             get_user_capes,
             equip_cape,
             remove_cape,
+            load_recent_skins,
+            save_recent_skin,
             
             // Minecraft versions
             get_minecraft_versions,

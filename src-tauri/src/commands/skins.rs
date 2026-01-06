@@ -1,6 +1,8 @@
 use crate::services::accounts::AccountManager;
 use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
 
 const MINECRAFT_SKIN_URL: &str = "https://api.minecraftservices.com/minecraft/profile/skins";
 const MINECRAFT_SKIN_RESET_URL: &str = "https://api.minecraftservices.com/minecraft/profile/skins/active";
@@ -95,6 +97,96 @@ struct SkinMetadata {
 #[derive(Deserialize, Debug)]
 struct CapeTexture {
     url: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct RecentSkin {
+    pub url: String,
+    pub variant: String,
+    pub timestamp: u64,
+}
+
+/// Helper function to get the recent skins file path
+fn get_recent_skins_path(account_uuid: &str) -> Result<PathBuf, String> {
+    let app_data_dir = dirs::data_dir()
+        .ok_or_else(|| "Failed to get app data directory".to_string())?;
+    
+    let launcher_dir = app_data_dir.join("AtomicLauncher");
+    let skins_dir = launcher_dir.join("recent_skins");
+    
+    // Create directory if it doesn't exist
+    if !skins_dir.exists() {
+        fs::create_dir_all(&skins_dir)
+            .map_err(|e| format!("Failed to create skins directory: {}", e))?;
+    }
+    
+    Ok(skins_dir.join(format!("{}.json", account_uuid)))
+}
+
+/// Load recent skins for an account
+#[tauri::command]
+pub async fn load_recent_skins(account_uuid: String) -> Result<Vec<RecentSkin>, String> {
+    let file_path = get_recent_skins_path(&account_uuid)?;
+    
+    if !file_path.exists() {
+        return Ok(Vec::new());
+    }
+    
+    let content = fs::read_to_string(&file_path)
+        .map_err(|e| format!("Failed to read recent skins file: {}", e))?;
+    
+    let skins: Vec<RecentSkin> = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse recent skins: {}", e))?;
+    
+    Ok(skins)
+}
+
+/// Save a recent skin for an account
+#[tauri::command]
+pub async fn save_recent_skin(
+    account_uuid: String,
+    skin_url: String,
+    variant: String,
+) -> Result<(), String> {
+    let file_path = get_recent_skins_path(&account_uuid)?;
+    
+    // Load existing skins
+    let mut skins = if file_path.exists() {
+        let content = fs::read_to_string(&file_path)
+            .map_err(|e| format!("Failed to read recent skins file: {}", e))?;
+        
+        serde_json::from_str::<Vec<RecentSkin>>(&content)
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    
+    // Remove the skin if it already exists
+    skins.retain(|s| s.url != skin_url);
+    
+    // Add the new skin at the beginning
+    let new_skin = RecentSkin {
+        url: skin_url,
+        variant,
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64,
+    };
+    
+    skins.insert(0, new_skin);
+    
+    // Keep only the last 3 skins
+    skins.truncate(3);
+    
+    // Save to file
+    let json = serde_json::to_string_pretty(&skins)
+        .map_err(|e| format!("Failed to serialize recent skins: {}", e))?;
+    
+    fs::write(&file_path, json)
+        .map_err(|e| format!("Failed to write recent skins file: {}", e))?;
+    
+    Ok(())
 }
 
 /// Upload a skin to Minecraft
