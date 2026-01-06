@@ -111,6 +111,11 @@ pub async fn upload_skin(
         .map_err(|e| format!("Failed to get active account: {}", e))?
         .ok_or_else(|| "No active account. Please sign in first.".to_string())?;
     
+    // Get a fresh token
+    let access_token = AccountManager::get_valid_token(&active_account.uuid)
+        .await
+        .map_err(|e| format!("Failed to get valid token: {}", e))?;
+    
     let image_bytes = general_purpose::STANDARD
         .decode(&skin_data)
         .map_err(|e| format!("Invalid base64 image data: {}", e))?;
@@ -147,7 +152,7 @@ pub async fn upload_skin(
     
     let response = client
         .post(MINECRAFT_SKIN_URL)
-        .bearer_auth(&active_account.access_token)
+        .bearer_auth(&access_token)
         .multipart(form)
         .send()
         .await
@@ -169,11 +174,16 @@ pub async fn reset_skin() -> Result<String, String> {
         .map_err(|e| format!("Failed to get active account: {}", e))?
         .ok_or_else(|| "No active account. Please sign in first.".to_string())?;
     
+    // Get a fresh token
+    let access_token = AccountManager::get_valid_token(&active_account.uuid)
+        .await
+        .map_err(|e| format!("Failed to get valid token: {}", e))?;
+    
     let client = reqwest::Client::new();
     
     let response = client
         .delete(MINECRAFT_SKIN_RESET_URL)
-        .bearer_auth(&active_account.access_token)
+        .bearer_auth(&access_token)
         .send()
         .await
         .map_err(|e| format!("Failed to reset skin: {}", e))?;
@@ -194,12 +204,17 @@ pub async fn get_current_skin() -> Result<Option<CurrentSkin>, String> {
         .map_err(|e| format!("Failed to get active account: {}", e))?
         .ok_or_else(|| "No active account. Please sign in first.".to_string())?;
     
+    // Get a fresh token
+    let access_token = AccountManager::get_valid_token(&active_account.uuid)
+        .await
+        .map_err(|e| format!("Failed to get valid token: {}", e))?;
+    
     let client = reqwest::Client::new();
     
     // Get profile from Microsoft API for skin info
     let response = client
         .get(MINECRAFT_PROFILE_URL)
-        .bearer_auth(&active_account.access_token)
+        .bearer_auth(&access_token)
         .send()
         .await
         .map_err(|e| format!("Failed to fetch profile: {}", e))?;
@@ -236,11 +251,16 @@ pub async fn get_user_capes() -> Result<UserCapesResponse, String> {
         .map_err(|e| format!("Failed to get active account: {}", e))?
         .ok_or_else(|| "No active account. Please sign in first.".to_string())?;
     
+    // Get a fresh token
+    let access_token = AccountManager::get_valid_token(&active_account.uuid)
+        .await
+        .map_err(|e| format!("Failed to get valid token: {}", e))?;
+    
     let client = reqwest::Client::new();
     
     let response = client
         .get(MINECRAFT_PROFILE_URL)
-        .bearer_auth(&active_account.access_token)
+        .bearer_auth(&access_token)
         .send()
         .await
         .map_err(|e| format!("Failed to fetch profile: {}", e))?;
@@ -317,6 +337,11 @@ pub async fn equip_cape(cape_id: String) -> Result<String, String> {
         .map_err(|e| format!("Failed to get active account: {}", e))?
         .ok_or_else(|| "No active account. Please sign in first.".to_string())?;
     
+    // Get a fresh token
+    let access_token = AccountManager::get_valid_token(&active_account.uuid)
+        .await
+        .map_err(|e| format!("Failed to get valid token: {}", e))?;
+    
     let client = reqwest::Client::new();
     
     let url = format!("https://api.minecraftservices.com/minecraft/profile/capes/active");
@@ -327,7 +352,7 @@ pub async fn equip_cape(cape_id: String) -> Result<String, String> {
     
     let response = client
         .put(&url)
-        .bearer_auth(&active_account.access_token)
+        .bearer_auth(&access_token)
         .json(&body)
         .send()
         .await
@@ -349,13 +374,18 @@ pub async fn remove_cape() -> Result<String, String> {
         .map_err(|e| format!("Failed to get active account: {}", e))?
         .ok_or_else(|| "No active account. Please sign in first.".to_string())?;
     
+    // Get a fresh token
+    let access_token = AccountManager::get_valid_token(&active_account.uuid)
+        .await
+        .map_err(|e| format!("Failed to get valid token: {}", e))?;
+    
     let client = reqwest::Client::new();
     
     let url = "https://api.minecraftservices.com/minecraft/profile/capes/active";
     
     let response = client
         .delete(url)
-        .bearer_auth(&active_account.access_token)
+        .bearer_auth(&access_token)
         .send()
         .await
         .map_err(|e| format!("Failed to remove cape: {}", e))?;

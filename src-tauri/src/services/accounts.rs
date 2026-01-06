@@ -152,37 +152,39 @@ impl AccountManager {
     }
 
     pub async fn get_valid_token(uuid: &str) -> Result<String, Box<dyn std::error::Error>> {
-        let mut data = Self::load_accounts()?;
-        
+        // Load fresh data to check token status
+        let data = Self::load_accounts()?;
         let account = data
             .accounts
-            .get_mut(uuid)
-            .ok_or("Account not found")?;
+            .get(uuid)
+            .ok_or("Account not found")?
+            .clone();
 
-        // Check if token is expired or will expire in next 5 minutes
         let now = Utc::now();
-        let refresh_threshold = chrono::Duration::minutes(5);
+        let buffer = chrono::Duration::minutes(5);
         
-        if account.token_expiry - now < refresh_threshold {
-            println!("Token expired or expiring soon, refreshing...");
-            
-            let authenticator = crate::auth::Authenticator::new()?;
-            let refreshed = authenticator.refresh_tokens(&account.refresh_token).await?;
-            
-            // Update stored account
-            account.access_token = refreshed.access_token.clone();
-            account.refresh_token = refreshed.refresh_token;
-            account.token_expiry = refreshed.token_expiry;
-            account.last_used = Some(now.to_rfc3339());
-            
-            Self::save_accounts(&data)?;
-            
-            println!("✓ Token refreshed successfully");
-            Ok(refreshed.access_token)
-        } else {
-            println!("Token still valid (expires in {} minutes)", 
-                     (account.token_expiry - now).num_minutes());
-            Ok(account.access_token.clone())
+        // Check if token is still valid (expires more than 5 minutes from now)
+        if account.token_expiry > now + buffer {
+            let minutes_until_expiry = (account.token_expiry - now).num_minutes();
+            println!("Token still valid (expires in {} minutes)", minutes_until_expiry);
+            return Ok(account.access_token);
         }
+        
+        // Token is expired or expiring soon, refresh it
+        println!("Token expired or expiring soon, refreshing...");
+        
+        let authenticator = crate::auth::Authenticator::new()?;
+        let refreshed = authenticator.refresh_tokens(&account.refresh_token).await?;
+        
+        // Update the account with new tokens
+        Self::update_account_tokens(
+            uuid,
+            refreshed.access_token.clone(),
+            refreshed.refresh_token,
+            refreshed.token_expiry,
+        )?;
+        
+        println!("✓ Token refreshed successfully");
+        Ok(refreshed.access_token)
     }
 }
