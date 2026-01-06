@@ -158,10 +158,23 @@ function App() {
 
   useEffect(() => {
     const initializeApp = async () => {
-      setIsReady(true)
+
       await new Promise(resolve => setTimeout(resolve, 100))
-      await invoke('frontend_ready')
+      setIsReady(true)
+
+      const splash = document.getElementById('splash-screen')
+      const root = document.getElementById('root')
+      
+      if (splash && root) {
+        splash.classList.add('hidden')
+        root.classList.add('visible')
+
+        setTimeout(() => {
+          splash.remove()
+        }, 500)
+      }
     }
+    
     initializeApp()
   }, [])
 
@@ -499,7 +512,7 @@ function App() {
   }
 
   return (
-    <div className={`flex flex-col h-screen bg-[#0d0d0d] text-[#e8e8e8] overflow-hidden font-sans ${!isReady ? 'opacity-0' : 'opacity-100 transition-opacity duration-300'}`}>
+    <div className="flex flex-col h-screen bg-[#0d0d0d] text-[#e8e8e8] overflow-hidden font-sans">
       <div 
         data-tauri-drag-region
         style={{ userSelect: 'none', WebkitAppRegion: 'drag' } as any}

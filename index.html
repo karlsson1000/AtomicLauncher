@@ -1,21 +1,93 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" style="background-color: #0d0d0d;">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Atomic Launcher</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
       body {
         background-color: #0d0d0d;
         margin: 0;
         padding: 0;
+        font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+
+      #splash-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #0d0d0d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 999999;
+        margin: 0;
+        padding: 0;
+      }
+
+      #splash-screen.hidden {
+        animation: fadeOut 0.5s ease-out forwards;
+      }
+
+      @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+      }
+
+      @keyframes pulse {
+        0%, 100% { 
+          opacity: 1; 
+        }
+        50% { 
+          opacity: 0.5; 
+        }
+      }
+
+      .splash-container {
+        text-align: center;
+        position: relative;
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      .splash-container img {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 16px;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .splash-container h1 {
+        color: #e8e8e8;
+        font-size: 24px;
+        font-weight: 600;
+        margin: 0;
+      }
+
+      #root {
+        position: relative;
       }
     </style>
   </head>
 
   <body>
+    <div id="splash-screen">
+      <div class="splash-container">
+        <img src="/logo.png" alt="Atomic Launcher" />
+        <h1>Atomic Launcher</h1>
+      </div>
+    </div>
     <div id="root"></div>
-    <script type="module" src="/src//frontend/main.tsx"></script>
+
+    <script type="module" src="/src/frontend/main.tsx"></script>
   </body>
 </html>

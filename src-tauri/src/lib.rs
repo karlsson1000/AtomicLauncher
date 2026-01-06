@@ -113,19 +113,6 @@ use commands::{
     open_url,
 };
 
-use tauri::{AppHandle, Manager};
-
-#[tauri::command]
-async fn frontend_ready(app: AppHandle) {
-    // Close splashscreen and show main window
-    if let Some(splashscreen) = app.get_webview_window("splashscreen") {
-        let _ = splashscreen.close();
-    }
-    if let Some(main) = app.get_webview_window("main") {
-        let _ = main.show();
-    }
-}
-
 #[tauri::command]
 fn get_app_version() -> String {
     include_str!("../commit_hash.txt").trim().to_string()
@@ -147,9 +134,6 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
-            // Splash screen
-            frontend_ready,
-            
             // App info
             get_app_version,
             
