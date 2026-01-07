@@ -59,8 +59,6 @@ use commands::{
     get_mod_versions,
     download_mod,
     get_project_details,
-    get_favorite_mods,
-    save_favorite_mods,
     
     // Modpack commands
     get_modpack_versions,
@@ -265,8 +263,6 @@ pub fn run() {
             delete_mod,
             open_mods_folder,
             toggle_mod,
-            get_favorite_mods,
-            save_favorite_mods,
 
             // Modpacks
             get_modpack_versions,

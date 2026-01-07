@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { invoke } from "@tauri-apps/api/core"
-import { Search, Download, Loader2, Package, ChevronDown, ChevronLeft, ChevronRight, Heart } from "lucide-react"
+import { Search, Download, Loader2, Package, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
 import type { Instance, ModrinthSearchResult, ModrinthProject, ModrinthVersion } from "../../types"
 
 interface ModFile {
@@ -171,19 +171,9 @@ export function ModsTab({ selectedInstance, instances, onSetSelectedInstance, sc
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(20)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  
-  // Favorites state
-  const [favoriteMods, setFavoriteMods] = useState<Array<{
-    projectId: string
-    title: string
-    iconUrl?: string | null
-  }>>([])
-  const [showFavorites, setShowFavorites] = useState(false)
-  const [installingFavorites, setInstallingFavorites] = useState(false)
 
   useEffect(() => {
     loadPopularMods()
-    loadFavoriteMods()
   }, [])
 
   useEffect(() => {
@@ -215,88 +205,6 @@ export function ModsTab({ selectedInstance, instances, onSetSelectedInstance, sc
       }
     }
   }, [searchQuery])
-
-  // Load favorite mods
-  const loadFavoriteMods = async () => {
-    try {
-      const stored = await invoke<string>("get_favorite_mods")
-      if (stored) {
-        setFavoriteMods(JSON.parse(stored))
-      }
-    } catch (error) {
-      console.error("Failed to load favorite mods:", error)
-      setFavoriteMods([])
-    }
-  }
-
-  // Save favorite mods
-  const saveFavoriteMods = async (mods: typeof favoriteMods) => {
-    try {
-      await invoke("save_favorite_mods", {
-        data: JSON.stringify(mods)
-      })
-      setFavoriteMods(mods)
-    } catch (error) {
-      console.error("Failed to save favorite mods:", error)
-    }
-  }
-
-  const toggleFavorite = (mod: ModrinthProject) => {
-    const exists = favoriteMods.some(m => m.projectId === mod.project_id)
-    
-    if (exists) {
-      const updated = favoriteMods.filter(m => m.projectId !== mod.project_id)
-      saveFavoriteMods(updated)
-    } else {
-      const updated = [...favoriteMods, {
-        projectId: mod.project_id,
-        title: mod.title,
-        iconUrl: mod.icon_url
-      }]
-      saveFavoriteMods(updated)
-    }
-  }
-
-  const isInFavorites = (projectId: string): boolean => {
-    return favoriteMods.some(m => m.projectId === projectId)
-  }
-
-  const installAllFavorites = async () => {
-    if (!selectedInstance || selectedInstance.loader !== "fabric") return
-    
-    setInstallingFavorites(true)
-    
-    for (const mod of favoriteMods) {
-      try {
-        const mcVersion = getMinecraftVersion(selectedInstance)
-        const versions = await invoke<ModrinthVersion[]>("get_mod_versions", {
-          idOrSlug: mod.projectId,
-          loaders: [selectedInstance.loader],
-          gameVersions: [mcVersion],
-        })
-        
-        const version = versions[0]
-        if (!version) continue
-        
-        const primaryFile = version.files.find(f => f.primary) || version.files[0]
-        if (!primaryFile) continue
-        
-        if (installedModFiles.has(primaryFile.filename)) continue
-        
-        await invoke<string>("download_mod", {
-          instanceName: selectedInstance.name,
-          downloadUrl: primaryFile.url,
-          filename: primaryFile.filename,
-        })
-        
-        setInstalledModFiles(prev => new Set(prev).add(primaryFile.filename))
-      } catch (error) {
-        console.error(`Failed to install ${mod.title}:`, error)
-      }
-    }
-    
-    setInstallingFavorites(false)
-  }
 
   const loadInstalledMods = async () => {
     if (!selectedInstance) return
@@ -435,7 +343,7 @@ export function ModsTab({ selectedInstance, instances, onSetSelectedInstance, sc
   const showPagination = searchResults && searchResults.total_hits > itemsPerPage
 
   return (
-     <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto">
       <div className="flex gap-2 mb-4">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#4a4a4a]" strokeWidth={2} />
@@ -452,65 +360,7 @@ export function ModsTab({ selectedInstance, instances, onSetSelectedInstance, sc
             </div>
           )}
         </div>
-        <button
-          onClick={() => setShowFavorites(!showFavorites)}
-          className={`p-2.5 rounded transition-colors relative cursor-pointer ${
-            showFavorites 
-              ? "bg-[#16a34a] text-white" 
-              : "bg-[#1a1a1a] hover:bg-[#1f1f1f] text-[#808080]"
-          }`}
-        >
-          <Heart size={18} className={showFavorites ? "fill-white" : ""} />
-          {favoriteMods.length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-[#16a34a] text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold">
-              {favoriteMods.length}
-            </span>
-          )}
-        </button>
       </div>
-
-      {showFavorites && favoriteMods.length > 0 && (
-        <div className="bg-[#1a1a1a] rounded-md p-4 mb-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-[#e8e8e8]">Favorite Mods ({favoriteMods.length})</h3>
-            <button
-              onClick={installAllFavorites}
-              disabled={!selectedInstance || installingFavorites}
-              className="flex items-center gap-2 px-4 py-2 bg-[#16a34a] hover:bg-[#15803d] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded text-sm font-medium transition-colors cursor-pointer"
-            >
-              {installingFavorites ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  Installing...
-                </>
-              ) : (
-                <>
-                  <Download size={16} />
-                  Install All
-                </>
-              )}
-            </button>
-          </div>
-          
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-            {favoriteMods.map((mod) => (
-              <div
-                key={mod.projectId}
-                className="bg-[#0d0d0d] rounded p-3"
-              >
-                {mod.iconUrl ? (
-                  <img src={mod.iconUrl} alt={mod.title} className="w-full aspect-square rounded-md mb-2" />
-                ) : (
-                  <div className="w-full aspect-square bg-gradient-to-br from-[#16a34a]/10 to-[#15803d]/10 rounded-md flex items-center justify-center mb-2">
-                    <Package size={20} className="text-[#16a34a]/60" />
-                  </div>
-                )}
-                <p className="text-xs text-[#e8e8e8] truncate font-medium">{mod.title}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {searchResults ? (
         <>
@@ -519,29 +369,12 @@ export function ModsTab({ selectedInstance, instances, onSetSelectedInstance, sc
               {searchResults.hits.map((mod) => (
                 <div
                   key={mod.project_id}
-                  className={`bg-[#1a1a1a] hover:bg-[#1f1f1f] rounded-md overflow-hidden cursor-pointer transition-all relative ${
+                  className={`bg-[#1a1a1a] hover:bg-[#1f1f1f] rounded-md overflow-hidden cursor-pointer transition-all ${
                     selectedMod?.project_id === mod.project_id ? "ring-2 ring-[#2a2a2a]" : ""
                   }`}
+                  onClick={() => handleModSelect(mod)}
                 >
-                  {showFavorites && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleFavorite(mod)
-                      }}
-                      className={`absolute bottom-3 right-3 p-2 rounded transition-colors z-10 cursor-pointer ${
-                        isInFavorites(mod.project_id)
-                          ? "bg-[#16a34a] text-white"
-                          : "bg-[#0d0d0d] hover:bg-[#1a1a1a] text-[#808080] hover:text-[#16a34a]"
-                      }`}
-                    >
-                      <Heart size={16} className={isInFavorites(mod.project_id) ? "fill-white" : ""} />
-                    </button>
-                  )}
-                  <div 
-                    className="flex min-h-0"
-                    onClick={() => handleModSelect(mod)}
-                  >
+                  <div className="flex min-h-0">
                     {mod.icon_url ? (
                       <div className="w-24 h-24 flex items-center justify-center flex-shrink-0 rounded m-2">
                         <img
