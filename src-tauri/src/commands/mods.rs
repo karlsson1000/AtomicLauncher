@@ -2,6 +2,7 @@ use crate::commands::validation::{sanitize_instance_name, sanitize_filename, val
 use crate::utils::{get_instance_dir, open_folder};
 use crate::utils::modrinth::{ModrinthClient, ModrinthProjectDetails, ModrinthSearchResult, ModrinthVersion};
 use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Manager};
 
 #[derive(Serialize, Deserialize)]
 pub struct ModFile {
@@ -278,4 +279,37 @@ pub async fn download_mod(
         .map_err(|e| format!("Failed to download mod: {}", e))?;
 
     Ok(format!("Successfully downloaded {}", safe_filename))
+}
+
+// ===== FAVORITE MODS STORAGE =====
+
+#[tauri::command]
+pub fn get_favorite_mods(app: AppHandle) -> Result<String, String> {
+    let app_dir = app.path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+    
+    let favorites_path = app_dir.join("favorite_mods.json");
+    
+    if favorites_path.exists() {
+        std::fs::read_to_string(favorites_path)
+            .map_err(|e| format!("Failed to read favorites: {}", e))
+    } else {
+        Ok("[]".to_string())
+    }
+}
+
+#[tauri::command]
+pub fn save_favorite_mods(app: AppHandle, data: String) -> Result<(), String> {
+    let app_dir = app.path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+
+    std::fs::create_dir_all(&app_dir)
+        .map_err(|e| format!("Failed to create app directory: {}", e))?;
+    
+    let favorites_path = app_dir.join("favorite_mods.json");
+    
+    std::fs::write(favorites_path, data)
+        .map_err(|e| format!("Failed to write favorites: {}", e))
 }
