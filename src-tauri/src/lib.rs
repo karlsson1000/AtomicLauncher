@@ -7,6 +7,7 @@ mod discord_rpc;
 
 use discord_rpc::DiscordRpc;
 use std::sync::Arc;
+use tauri_plugin_updater::UpdaterExt;
 
 use commands::{
     // Auth commands
@@ -133,8 +134,54 @@ pub fn run() {
     );
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            // Check for updates on startup
+            #[cfg(desktop)]
+            {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    match handle.updater() {
+                        Ok(updater) => {
+                            match updater.check().await {
+                                Ok(Some(update)) => {
+                                    println!("Update available: {}", update.version);
+                                    let mut downloaded = 0;
+                                    
+                                    match update.download_and_install(
+                                        |chunk_length, content_length| {
+                                            downloaded += chunk_length;
+                                            if let Some(total) = content_length {
+                                                let percent = (downloaded as f64 / total as f64 * 100.0) as u32;
+                                                println!("Downloaded {}% ({}/{})", percent, downloaded, total);
+                                            }
+                                        },
+                                        || {
+                                            println!("Download finished, installing update...");
+                                        },
+                                    ).await {
+                                        Ok(_) => println!("Update installed successfully!"),
+                                        Err(e) => eprintln!("Failed to install update: {}", e),
+                                    }
+                                }
+                                Ok(None) => {
+                                    println!("No updates available");
+                                }
+                                Err(e) => {
+                                    eprintln!("Failed to check for updates: {}", e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to get updater: {}", e);
+                        }
+                    }
+                });
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // App info
             get_app_version,
