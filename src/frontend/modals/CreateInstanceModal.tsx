@@ -29,6 +29,7 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
   const [fabricVersions, setFabricVersions] = useState<FabricVersion[]>([])
   const [selectedFabricVersion, setSelectedFabricVersion] = useState<string>("")
   const [isLoadingFabric, setIsLoadingFabric] = useState(false)
+  const [isClosing, setIsClosing] = useState(false)
   const [alertModal, setAlertModal] = useState<{
     isOpen: boolean
     title: string
@@ -102,12 +103,10 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
 
   useEffect(() => {
     if (loaderType === "fabric") {
-      // Force back to releases for modded loaders
       if (versionFilter === "snapshot") {
         setVersionFilter("release")
       }
       
-      // Check if current version is supported
       if (!fabricSupportedVersions.includes(selectedVersion)) {
         const firstSupported = allVersions.find(v => 
           (v.type === "release" || v.type === "old_beta" || v.type === "old_alpha") && 
@@ -118,7 +117,6 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
         }
       }
       
-      // Load loader versions
       if (fabricVersions.length === 0) {
         loadFabricVersions()
       }
@@ -149,6 +147,14 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
     }
   }
 
+  const handleClose = () => {
+    setIsClosing(true)
+    setTimeout(() => {
+      setIsClosing(false)
+      onClose()
+    }, 150)
+  }
+
   const handleImportFile = async () => {
     try {
       const selected = await open({
@@ -163,7 +169,7 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
 
       const filePath = selected as string
       
-      onClose()
+      handleClose()
 
       let extractedName = ""
       try {
@@ -213,7 +219,7 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
     const finalName = newInstanceName.trim()
 
     onStartCreating(finalName)
-    onClose()
+    handleClose()
     
     try {
       await invoke<string>("create_instance", {
@@ -246,19 +252,67 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-[#1a1a1a] rounded-md w-full max-w-md shadow-2xl">
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes fadeOut {
+          from { opacity: 1; }
+          to { opacity: 0; }
+        }
+        @keyframes scaleIn {
+          from { 
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to { 
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        @keyframes scaleOut {
+          from { 
+            opacity: 1;
+            transform: scale(1);
+          }
+          to { 
+            opacity: 0;
+            transform: scale(0.95);
+          }
+        }
+        .modal-backdrop {
+          animation: fadeIn 0.15s ease-out forwards;
+        }
+        .modal-backdrop.closing {
+          animation: fadeOut 0.15s ease-in forwards;
+        }
+        .modal-content {
+          animation: scaleIn 0.15s ease-out forwards;
+        }
+        .modal-content.closing {
+          animation: scaleOut 0.15s ease-in forwards;
+        }
+      `}</style>
+      <div 
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 modal-backdrop ${isClosing ? 'closing' : ''}`}
+        onClick={handleClose}
+      >
+        <div 
+          className={`bg-[#141414] border border-[#2a2a2a] rounded-md w-full max-w-md shadow-2xl modal-content ${isClosing ? 'closing' : ''}`}
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="flex items-center justify-between p-5">
             <div className="flex items-center gap-3">
-              <Package size={32} className="text-[#16a34a]" strokeWidth={1.5} />
+              <Package size={24} className="text-[#16a34a]" strokeWidth={1.5} />
               <div>
-                <h2 className="text-base font-semibold text-[#e8e8e8] tracking-tight">Create Instance</h2>
-                <p className="text-xs text-[#808080] mt-0.5">Set up a new Minecraft instance</p>
+                <h2 className="text-base font-semibold text-[#e6edf3] tracking-tight">Create Instance</h2>
+                <p className="text-xs text-[#7d8590] mt-0.5">Set up a new Minecraft instance</p>
               </div>
             </div>
             <button 
-              onClick={onClose} 
-              className="p-1.5 hover:bg-[#0d0d0d] rounded transition-colors text-[#808080] hover:text-[#e8e8e8] cursor-pointer"
+              onClick={handleClose} 
+              className="p-1.5 hover:bg-[#1a1a1a] rounded transition-colors text-[#7d8590] hover:text-[#e6edf3] cursor-pointer"
             >
               <X size={16} strokeWidth={2} />
             </button>
@@ -270,7 +324,7 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
                 type="button"
                 onClick={() => {}}
                 disabled={isCreating}
-                className="px-4 py-3 rounded text-sm font-medium transition-all cursor-pointer bg-[#16a34a]/10 ring-2 ring-[#16a34a] text-[#e8e8e8]"
+                className="px-4 py-3 rounded text-sm font-medium transition-all cursor-pointer bg-[#16a34a]/10 border-2 border-[#16a34a] text-[#e6edf3]"
               >
                 <div className="flex items-center justify-center gap-2">
                   <Package size={20} className="text-[#16a34a]" strokeWidth={1.5} />
@@ -281,26 +335,26 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
                 type="button"
                 onClick={handleImportFile}
                 disabled={isCreating}
-                className="px-4 py-3 rounded text-sm font-medium transition-all cursor-pointer bg-[#0d0d0d] text-[#808080] hover:bg-[#2a2a2a]"
+                className="px-4 py-3 rounded text-sm font-medium transition-all cursor-pointer bg-[#0f0f0f] border border-[#2a2a2a] text-[#7d8590] hover:bg-[#1a1a1a] hover:border-[#3a3a3a]"
               >
                 <div className="flex items-center justify-center gap-2">
-                  <FileDown size={20} className="text-[#4a4a4a]" strokeWidth={1.5} />
+                  <FileDown size={20} className="text-[#3a3a3a]" strokeWidth={1.5} />
                   <span>Import File</span>
                 </div>
               </button>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#808080] mb-2">Instance Name</label>
+              <label className="block text-xs font-medium text-[#7d8590] mb-2">Instance Name</label>
               <input
                 type="text"
                 value={newInstanceName}
                 onChange={(e) => setNewInstanceName(e.target.value)}
                 placeholder="My Minecraft Instance"
-                className={`w-full bg-[#0d0d0d] rounded px-3 py-2.5 text-sm text-[#e8e8e8] placeholder-[#4a4a4a] focus:outline-none transition-colors ${
+                className={`w-full bg-[#0f0f0f] border rounded px-3 py-2.5 text-sm text-[#e6edf3] placeholder-[#3a3a3a] focus:outline-none transition-colors ${
                   instanceExists && newInstanceName.trim()
-                    ? 'ring-1 ring-red-500/50 focus:ring-red-500'
-                    : 'focus:ring-1 focus:ring-[#16a34a]'
+                    ? 'border-red-500/50 focus:border-red-500'
+                    : 'border-[#2a2a2a] focus:border-[#16a34a]'
                 }`}
                 disabled={isCreating}
               />
@@ -313,7 +367,7 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#808080] mb-2">Version Type</label>
+              <label className="block text-xs font-medium text-[#7d8590] mb-2">Version Type</label>
               <div className="flex gap-2 mb-3">
                 <button
                   type="button"
@@ -322,18 +376,20 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
                     const releases = allVersions.filter(v => 
                       v.type === "release" || v.type === "old_beta" || v.type === "old_alpha"
                     )
-                    const availableReleases = loaderType === "fabric" 
-                      ? releases.filter(v => fabricSupportedVersions.includes(v.id))
-                      : releases
+                    let availableReleases = releases
+                    
+                    if (loaderType === "fabric") {
+                      availableReleases = releases.filter(v => fabricSupportedVersions.includes(v.id))
+                    }
                     
                     if (availableReleases.length > 0) {
                       setSelectedVersion(availableReleases[0].id)
                     }
                   }}
-                  className={`px-6 py-1.5 rounded text-sm font-medium transition-all cursor-pointer ${
+                  className={`px-6 py-1.5 rounded text-sm font-medium transition-all cursor-pointer border ${
                     versionFilter === "release"
-                      ? "bg-[#16a34a]/10 ring-2 ring-[#16a34a] text-[#e8e8e8]"
-                      : "bg-[#0d0d0d] text-[#808080] hover:bg-[#2a2a2a]"
+                      ? "bg-[#16a34a]/10 border-[#16a34a] text-[#e6edf3]"
+                      : "bg-[#0f0f0f] border-[#2a2a2a] text-[#7d8590] hover:bg-[#1a1a1a] hover:border-[#3a3a3a]"
                   }`}
                 >
                   Releases
@@ -349,26 +405,26 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
                     }
                   }}
                   disabled={loaderType !== "vanilla"}
-                  className={`px-6 py-1.5 rounded text-sm font-medium transition-all cursor-pointer ${
+                  className={`px-6 py-1.5 rounded text-sm font-medium transition-all cursor-pointer border ${
                     versionFilter === "snapshot"
-                      ? "bg-[#eab308]/10 ring-2 ring-[#eab308] text-[#e8e8e8]"
-                      : "bg-[#0d0d0d] text-[#808080] hover:bg-[#2a2a2a]"
+                      ? "bg-[#eab308]/10 border-[#eab308] text-[#e6edf3]"
+                      : "bg-[#0f0f0f] border-[#2a2a2a] text-[#7d8590] hover:bg-[#1a1a1a] hover:border-[#3a3a3a]"
                   } ${loaderType !== "vanilla" ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   Snapshots
                 </button>
               </div>
 
-              <label className="block text-xs font-medium text-[#808080] mb-2">
+              <label className="block text-xs font-medium text-[#7d8590] mb-2">
                 Minecraft Version
               </label>
               {isLoadingVersions ? (
-                <div className="flex items-center gap-2 text-[#808080] text-xs py-2 px-3 bg-[#0d0d0d] rounded">
+                <div className="flex items-center gap-2 text-[#7d8590] text-xs py-2 px-3 bg-[#0f0f0f] border border-[#2a2a2a] rounded">
                   <Loader2 size={14} className="animate-spin" />
                   <span>Loading versions...</span>
                 </div>
               ) : filteredVersions.length === 0 ? (
-                <div className="flex items-center gap-2 text-[#808080] text-xs py-2 px-3 bg-[#0d0d0d] rounded">
+                <div className="flex items-center gap-2 text-[#7d8590] text-xs py-2 px-3 bg-[#0f0f0f] border border-[#2a2a2a] rounded">
                   <AlertCircle size={14} />
                   <span>No compatible versions available</span>
                 </div>
@@ -377,7 +433,7 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
                   <select
                     value={selectedVersion}
                     onChange={(e) => setSelectedVersion(e.target.value)}
-                    className="w-full bg-[#0d0d0d] rounded px-3 py-2.5 pr-10 text-sm text-[#e8e8e8] focus:outline-none focus:ring-1 focus:ring-[#16a34a] transition-colors appearance-none"
+                    className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-3 py-2.5 pr-10 text-sm text-[#e6edf3] focus:outline-none focus:border-[#16a34a] transition-colors appearance-none"
                     disabled={isCreating}
                   >
                     {filteredVersions.map((version) => (
@@ -387,7 +443,7 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
                     ))}
                   </select>
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#808080" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7d8590" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
                   </div>
@@ -396,20 +452,20 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#808080] mb-2">Mod Loader</label>
-              <div className="flex gap-2">
+              <label className="block text-xs font-medium text-[#7d8590] mb-2">Mod Loader</label>
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setLoaderType("vanilla")}
                   disabled={isCreating}
-                  className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-all cursor-pointer ${
+                  className={`px-3 py-2.5 rounded text-sm font-medium transition-all cursor-pointer border ${
                     loaderType === "vanilla"
-                      ? "bg-[#16a34a]/10 ring-2 ring-[#16a34a] text-[#e8e8e8]"
-                      : "bg-[#0d0d0d] text-[#808080] hover:bg-[#2a2a2a]"
+                      ? "bg-[#16a34a]/10 border-[#16a34a] text-[#e6edf3]"
+                      : "bg-[#0f0f0f] border-[#2a2a2a] text-[#7d8590] hover:bg-[#1a1a1a] hover:border-[#3a3a3a]"
                   }`}
                 >
                   <div className="flex items-center justify-center gap-2">
-                    <Package size={18} className={loaderType === "vanilla" ? "text-[#16a34a]" : "text-[#4a4a4a]"} strokeWidth={1.5} />
+                    <Package size={18} className={loaderType === "vanilla" ? "text-[#16a34a]" : "text-[#3a3a3a]"} strokeWidth={1.5} />
                     <span>Vanilla</span>
                   </div>
                 </button>
@@ -417,14 +473,14 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
                   type="button"
                   onClick={() => setLoaderType("fabric")}
                   disabled={isCreating}
-                  className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-all cursor-pointer ${
+                  className={`px-3 py-2.5 rounded text-sm font-medium transition-all cursor-pointer border ${
                     loaderType === "fabric"
-                      ? "bg-[#3b82f6]/10 ring-2 ring-[#3b82f6] text-[#e8e8e8]"
-                      : "bg-[#0d0d0d] text-[#808080] hover:bg-[#2a2a2a]"
+                      ? "bg-[#3b82f6]/10 border-[#3b82f6] text-[#e6edf3]"
+                      : "bg-[#0f0f0f] border-[#2a2a2a] text-[#7d8590] hover:bg-[#1a1a1a] hover:border-[#3a3a3a]"
                   }`}
                 >
                   <div className="flex items-center justify-center gap-2">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className={loaderType === "fabric" ? "text-[#3b82f6]" : "text-[#4a4a4a]"}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className={loaderType === "fabric" ? "text-[#3b82f6]" : "text-[#3a3a3a]"}>
                       <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                       <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                       <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -437,9 +493,9 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
 
             {loaderType === "fabric" && (
               <div>
-                <label className="block text-xs font-medium text-[#808080] mb-2">Fabric Loader Version</label>
+                <label className="block text-xs font-medium text-[#7d8590] mb-2">Fabric Loader Version</label>
                 {isLoadingFabric ? (
-                  <div className="flex items-center gap-2 text-[#808080] text-xs py-2 px-3 bg-[#0d0d0d] rounded">
+                  <div className="flex items-center gap-2 text-[#7d8590] text-xs py-2 px-3 bg-[#0f0f0f] border border-[#2a2a2a] rounded">
                     <Loader2 size={14} className="animate-spin text-[#3b82f6]" />
                     <span>Loading versions...</span>
                   </div>
@@ -448,7 +504,7 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
                     <select
                       value={selectedFabricVersion}
                       onChange={(e) => setSelectedFabricVersion(e.target.value)}
-                      className="w-full bg-[#0d0d0d] rounded px-3 py-2.5 pr-10 text-sm text-[#e8e8e8] focus:outline-none focus:ring-1 focus:ring-[#3b82f6] transition-colors appearance-none"
+                      className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-3 py-2.5 pr-10 text-sm text-[#e6edf3] focus:outline-none focus:border-[#3b82f6] transition-colors appearance-none"
                       disabled={isCreating}
                     >
                       {fabricVersions.map((version) => (
@@ -458,7 +514,7 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
                       ))}
                     </select>
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#808080" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7d8590" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
                       </svg>
                     </div>
@@ -470,9 +526,9 @@ export function CreateInstanceModal({ versions, instances, onClose, onSuccess, o
 
           <div className="flex items-center justify-end gap-2 p-5">
             <button
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isCreating}
-              className="px-4 py-2 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#e8e8e8] rounded font-medium text-sm transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-[#1a1a1a] hover:bg-[#2a2a2a] text-[#e6edf3] rounded font-medium text-sm transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed border border-[#2a2a2a]"
             >
               Cancel
             </button>

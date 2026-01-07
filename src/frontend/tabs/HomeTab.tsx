@@ -1,4 +1,4 @@
-import { Package, Plus, FolderOpen, Copy, Trash2, Play, ExternalLink } from "lucide-react"
+import { Package, Plus, FolderOpen, Copy, Trash2, Play, ExternalLink, LayoutGrid, LayoutList } from "lucide-react"
 import { useState, useEffect } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import type { Instance } from "../../types"
@@ -61,6 +61,7 @@ export function HomeTab({
   const [instanceIcons, setInstanceIcons] = useState<Record<string, string | null>>({})
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
   const [loadingSnapshots, setLoadingSnapshots] = useState(true)
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
 
   // Get only the 5 most recently played instances
   const recentInstances = instances
@@ -131,6 +132,15 @@ export function HomeTab({
 
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString)
+    const now = new Date()
+    const diffTime = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+    
+    if (diffDays === 0) return 'Today'
+    if (diffDays === 1) return 'Yesterday'
+    if (diffDays < 7) return `${diffDays} days ago`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
+    
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
@@ -174,113 +184,197 @@ export function HomeTab({
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-semibold text-[#e8e8e8] tracking-tight">Home</h1>
-            <p className="text-sm text-[#808080] mt-0.5">Recently played instances</p>
+            <h1 className="text-2xl font-semibold text-[#e6edf3] tracking-tight">Home</h1>
+            <p className="text-sm text-[#7d8590] mt-0.5">Recently played instances</p>
           </div>
-          <button
-            onClick={onCreateNew}
-            className="w-10 h-10 hover:bg-[#1a1a1a] text-[#e8e8e8] rounded flex items-center justify-center transition-all cursor-pointer"
-            title="New Instance"
-          >
-            <Plus size={28} strokeWidth={2} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+              className="w-8.5 h-8.5 hover:bg-[#1a1a1a] text-[#7d8590] hover:text-[#e6edf3] rounded flex items-center justify-center transition-colors cursor-pointer"
+            >
+              {viewMode === "grid" ? <LayoutList size={22} /> : <LayoutGrid size={22} />}
+            </button>
+            <button
+              onClick={onCreateNew}
+              className="px-4 h-8 bg-[#238636] hover:bg-[#2ea043] text-white rounded-md text-sm font-medium flex items-center gap-2 transition-colors cursor-pointer"
+            >
+              <Plus size={16} />
+              New
+            </button>
+          </div>
         </div>
 
         {/* Instances Section */}
         <div>
           {recentInstances.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-18">
+            <div className="flex flex-col items-center justify-center py-14">
               <Package size={48} className="text-[#16a34a] mb-3" strokeWidth={1.5} />
-              <h3 className="text-base font-semibold text-[#e8e8e8] mb-1">No recently played instances</h3>
-              <p className="text-sm text-[#808080] mb-4">Launch an instance to see it here</p>
+              <h3 className="text-base font-semibold text-[#e6edf3] mb-1">No recently played instances</h3>
+              <p className="text-sm text-[#7d8590] mb-4">Launch an instance to see it here</p>
               <button
                 onClick={onCreateNew}
-                className="px-4 py-2 bg-[#16a34a] hover:bg-[#15803d] text-white rounded font-medium text-sm flex items-center gap-2 transition-all cursor-pointer"
+                className="px-4 py-2 bg-[#238636] hover:bg-[#2ea043] text-white rounded font-medium text-sm flex items-center gap-2 transition-all cursor-pointer"
               >
                 <Plus size={16} strokeWidth={2} />
                 <span>Create Instance</span>
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {recentInstances.map((instance) => {
-                const icon = instanceIcons[instance.name]
-                const isLaunching = launchingInstanceName === instance.name
-                const isRunning = runningInstances.has(instance.name)
-                return (
-                  <div
-                    key={instance.name}
-                    onClick={() => onShowDetails(instance)}
-                    onContextMenu={(e) => handleContextMenu(e, instance)}
-                    className="group relative bg-[#1a1a1a] rounded-md overflow-hidden cursor-pointer transition-all hover:ring-2 hover:ring-[#2a2a2a]"
-                  >
-                    {/* Square Image Section */}
-                    <div className="aspect-square bg-[#141414] flex items-center justify-center overflow-hidden">
-                      {icon ? (
-                        <img
-                          src={icon}
-                          alt={instance.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Package size={88} className="text-[#4a4a4a]" strokeWidth={1.5} />
-                      )}
-                    </div>
-                    
-                    {/* Solid Text Section with Play Button */}
-                    <div className="bg-[#1a1a1a] p-3 flex items-center justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold text-[#e8e8e8] truncate mb-0.5">{instance.name}</h3>
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <span className="text-[#808080]">{getMinecraftVersion(instance)}</span>
-                          <span className="text-[#4a4a4a]">•</span>
-                          {instance.loader === "fabric" ? (
-                            <span className="text-[#3b82f6]">Fabric</span>
+            <>
+              {viewMode === "grid" ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                  {recentInstances.map((instance) => {
+                    const icon = instanceIcons[instance.name]
+                    const isLaunching = launchingInstanceName === instance.name
+                    const isRunning = runningInstances.has(instance.name)
+                    return (
+                      <div
+                        key={instance.name}
+                        onClick={() => onShowDetails(instance)}
+                        onContextMenu={(e) => handleContextMenu(e, instance)}
+                        className="group relative bg-[#141414] rounded-md overflow-hidden cursor-pointer transition-all hover:ring-1 hover:ring-[#2a2a2a] border border-[#2a2a2a]"
+                      >
+                        {/* Square Image Section */}
+                        <div className="aspect-square bg-[#0f0f0f] flex items-center justify-center overflow-hidden">
+                          {icon ? (
+                            <img
+                              src={icon}
+                              alt={instance.name}
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
-                            <span className="text-[#16a34a]">Vanilla</span>
+                            <Package size={88} className="text-[#3a3a3a]" strokeWidth={1.5} />
+                          )}
+                        </div>
+                        
+                        {/* Solid Text Section with Play Button */}
+                        <div className="bg-[#141414] p-3 flex items-center justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-semibold text-[#e6edf3] truncate mb-0.5">{instance.name}</h3>
+                            <div className="flex items-center gap-1.5 text-xs">
+                              <span className="text-[#7d8590]">{getMinecraftVersion(instance)}</span>
+                              <span className="text-[#3a3a3a]">•</span>
+                              {instance.loader === "fabric" ? (
+                                <span className="text-[#3b82f6]">Fabric</span>
+                              ) : (
+                                <span className="text-[#16a34a]">Vanilla</span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Play Button */}
+                          {isAuthenticated && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (isRunning && onKillInstance) {
+                                  onKillInstance(instance)
+                                } else {
+                                  onLaunch(instance)
+                                }
+                              }}
+                              disabled={launchingInstanceName !== null && !isRunning}
+                              className={`flex-shrink-0 w-10 h-10 flex items-center justify-center rounded transition-all cursor-pointer ${
+                                isRunning || isLaunching
+                                  ? "bg-red-500/10 text-red-400"
+                                  : "bg-[#16a34a]/10 hover:bg-[#16a34a]/20 text-[#16a34a]"
+                              } disabled:opacity-50`}
+                              title={isRunning ? "Stop instance" : "Launch instance"}
+                            >
+                              {isLaunching || isRunning ? (
+                                <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                              ) : (
+                                <Play size={18} fill="currentColor" strokeWidth={0} />
+                              )}
+                            </button>
                           )}
                         </div>
                       </div>
-                      
-                      {/* Play Button */}
-                      {isAuthenticated && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (isRunning && onKillInstance) {
-                              onKillInstance(instance)
-                            } else {
-                              onLaunch(instance)
-                            }
-                          }}
-                          disabled={launchingInstanceName !== null && !isRunning}
-                          className={`opacity-0 group-hover:opacity-100 flex-shrink-0 w-10 h-10 flex items-center justify-center rounded transition-all cursor-pointer ${
-                            isRunning || isLaunching
-                              ? "bg-red-500/10 text-red-400 opacity-100"
-                              : "bg-[#16a34a]/10 hover:bg-[#16a34a]/20 text-[#16a34a]"
-                          } disabled:opacity-50`}
-                          title={isRunning ? "Stop instance" : "Launch instance"}
-                        >
-                          {isLaunching || isRunning ? (
-                            <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {recentInstances.map((instance) => {
+                    const icon = instanceIcons[instance.name]
+                    const isLaunching = launchingInstanceName === instance.name
+                    const isRunning = runningInstances.has(instance.name)
+                    return (
+                      <div
+                        key={instance.name}
+                        onClick={() => onShowDetails(instance)}
+                        onContextMenu={(e) => handleContextMenu(e, instance)}
+                        className="group relative bg-[#141414] rounded-md overflow-hidden cursor-pointer transition-all hover:ring-1 hover:ring-[#2a2a2a] border border-[#2a2a2a] flex items-center"
+                      >
+                        {/* Instance Image */}
+                        <div className="w-20 h-20 bg-[#0f0f0f] flex items-center justify-center flex-shrink-0">
+                          {icon ? (
+                            <img
+                              src={icon}
+                              alt={instance.name}
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
-                            <Play size={18} fill="currentColor" strokeWidth={0} />
+                            <Package size={32} className="text-[#3a3a3a]" strokeWidth={1.5} />
                           )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+                        </div>
+                        
+                        {/* Instance Info */}
+                        <div className="flex-1 min-w-0 px-4 py-3">
+                          <h3 className="text-base font-semibold text-[#e6edf3] truncate mb-1">{instance.name}</h3>
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-[#7d8590]">{getMinecraftVersion(instance)}</span>
+                            <span className="text-[#3a3a3a]">•</span>
+                            {instance.loader === "fabric" ? (
+                              <span className="text-[#3b82f6]">Fabric</span>
+                            ) : (
+                              <span className="text-[#16a34a]">Vanilla</span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Play Button */}
+                        {isAuthenticated && (
+                          <div className="px-4">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (isRunning && onKillInstance) {
+                                  onKillInstance(instance)
+                                } else {
+                                  onLaunch(instance)
+                                }
+                              }}
+                              disabled={launchingInstanceName !== null && !isRunning}
+                              className={`flex-shrink-0 w-10 h-10 flex items-center justify-center rounded transition-all cursor-pointer ${
+                                isRunning || isLaunching
+                                  ? "bg-red-500/10 text-red-400"
+                                  : "bg-[#16a34a]/10 hover:bg-[#16a34a]/20 text-[#16a34a]"
+                              } disabled:opacity-50`}
+                              title={isRunning ? "Stop instance" : "Launch instance"}
+                            >
+                              {isLaunching || isRunning ? (
+                                <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                              ) : (
+                                <Play size={18} fill="currentColor" strokeWidth={0} />
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
           )}
         </div>
 
         {/* Snapshots Section */}
-        <div>
+        <div className="mt-auto">
           <div className="mb-4">
-            <h2 className="text-xl font-semibold text-[#e8e8e8] tracking-tight">Latest Snapshots</h2>
-            <p className="text-sm text-[#808080] mt-0.5">Recent Java Edition snapshots</p>
+            <h2 className="text-xl font-semibold text-[#e6edf3] tracking-tight">Latest Snapshots</h2>
+            <p className="text-sm text-[#7d8590] mt-0.5">Recent Java Edition snapshots</p>
           </div>
 
           {loadingSnapshots ? (
@@ -288,8 +382,8 @@ export function HomeTab({
               <div className="w-8 h-8 border-2 border-[#2a2a2a] border-t-[#16a34a] rounded-full animate-spin" />
             </div>
           ) : snapshots.length === 0 ? (
-            <div className="bg-[#1a1a1a] rounded-md p-8 text-center">
-              <p className="text-[#808080]">Unable to load snapshots</p>
+            <div className="bg-[#141414] rounded-md p-8 text-center">
+              <p className="text-[#7d8590]">Unable to load snapshots</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -303,15 +397,15 @@ export function HomeTab({
                       console.error('Failed to open link:', error)
                     }
                   }}
-                  className="bg-[#1a1a1a] rounded-md overflow-hidden relative group cursor-pointer"
+                  className="bg-[#141414] rounded-md overflow-hidden relative group cursor-pointer border border-[#2a2a2a] hover:border-[#3a3a3a] transition-colors flex flex-col"
                 >
                   {/* External Link Icon */}
-                  <div className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <ExternalLink size={20} className="text-[#e8e8e8]" />
+                  <div className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center bg-[#141414]/90 backdrop-blur-sm rounded border border-[#2a2a2a] opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ExternalLink size={14} className="text-[#e6edf3]" />
                   </div>
                   
                   {/* Snapshot Image */}
-                  <div className="h-40 bg-[#141414] overflow-hidden relative">
+                  <div className="h-40 bg-[#0f0f0f] overflow-hidden relative flex-shrink-0">
                     {snapshot.image?.url ? (
                       <img
                         src={`https://launchercontent.mojang.com${snapshot.image.url}`}
@@ -320,7 +414,7 @@ export function HomeTab({
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <Package size={48} className="text-[#4a4a4a]" strokeWidth={1.5} />
+                        <Package size={48} className="text-[#3a3a3a]" strokeWidth={1.5} />
                       </div>
                     )}
                     {/* Hover Overlay - Gradient from bottom */}
@@ -328,19 +422,19 @@ export function HomeTab({
                   </div>
                   
                   {/* Content */}
-                  <div className="p-4">
+                  <div className="p-4 flex-1 flex flex-col">
                     <div className="flex items-center justify-between gap-2 mb-2">
-                      <h3 className="text-base font-semibold text-[#e8e8e8]">
+                      <h3 className="text-sm font-semibold text-[#e6edf3] truncate">
                         {cleanVersionName(snapshot.version)}
                       </h3>
                       {snapshot.date && (
-                        <span className="text-xs text-[#808080] whitespace-nowrap">
+                        <span className="text-xs text-[#7d8590] whitespace-nowrap">
                           {formatDate(snapshot.date)}
                         </span>
                       )}
                     </div>
                     {snapshot.shortText && (
-                      <p className="text-xs text-[#808080] line-clamp-3">
+                      <p className="text-xs text-[#7d8590] line-clamp-3 leading-snug">
                         {snapshot.shortText}
                       </p>
                     )}

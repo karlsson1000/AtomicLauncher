@@ -158,7 +158,6 @@ function App() {
 
   useEffect(() => {
     const initializeApp = async () => {
-
       await new Promise(resolve => setTimeout(resolve, 100))
       setIsReady(true)
 
@@ -168,7 +167,6 @@ function App() {
       if (splash && root) {
         splash.classList.add('hidden')
         root.classList.add('visible')
-
         setTimeout(() => {
           splash.remove()
         }, 500)
@@ -187,29 +185,24 @@ function App() {
     loadAccounts()
     loadSidebarBackground()
     
-    // Listen for console logs
     const unlistenConsole = listen<ConsoleLog>("console-log", (event) => {
       setConsoleLogs((prev) => [...prev, event.payload])
     })
     
-    // Listen for instance exit events
     const unlistenExit = listen<{ instance: string }>("instance-exited", (event) => {
       setRunningInstances((prev) => {
         const newSet = new Set(prev)
         newSet.delete(event.payload.instance)
         return newSet
       })
-
       setLaunchingInstanceName(null)
     })
     
-    // Listen for server instance launching
     const unlistenServerLaunch = listen<{ instance: string, server: string }>("server-instance-launching", (event) => {
       console.log(`Server launch detected: ${event.payload.instance} connecting to ${event.payload.server}`)
       setLaunchingInstanceName(event.payload.instance)
       setConsoleLogs([])
       setActiveTab("console")
-      // Mark instance as running immediately
       setRunningInstances((prev) => new Set(prev).add(event.payload.instance))
     })
     
@@ -512,15 +505,15 @@ function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[#0d0d0d] text-[#e8e8e8] overflow-hidden font-sans">
+    <div className="flex flex-col h-screen bg-[#101010] text-[#e6edf3] overflow-hidden font-sans">
       <div 
         data-tauri-drag-region
         style={{ userSelect: 'none', WebkitAppRegion: 'drag' } as any}
-        className="h-10 bg-[#1a1a1a] flex-shrink-0 fixed top-0 left-0 right-0 z-50 flex items-center px-4"
+        className="h-10 bg-[#1a1a1a] flex-shrink-0 fixed top-0 left-0 right-0 z-50 flex items-center px-4 border-b border-[#2a2a2a]"
       >
         <div className="flex items-center gap-2 mr-20">
           <img src="/logo.png" alt="Atomic Launcher" className="h-5 w-5" />
-          <span className="text-sm font-semibold text-[#e8e8e8]">Atomic Launcher</span>
+          <span className="text-sm font-semibold text-[#e6edf3]">Atomic Launcher</span>
         </div>
         
         <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as any}>
@@ -529,8 +522,8 @@ function App() {
             disabled={historyIndex <= 0}
             className={`h-7 w-7 flex items-center justify-center rounded transition-colors ${
               historyIndex > 0
-                ? "text-[#e8e8e8] hover:bg-[#2a2a2a] cursor-pointer" 
-                : "text-[#4a4a4a] cursor-not-allowed"
+                ? "text-[#e6edf3] hover:bg-[#2a2a2a] cursor-pointer" 
+                : "text-[#3a3a3a] cursor-not-allowed"
             }`}
           >
             <ChevronLeft size={16} strokeWidth={4} />
@@ -540,8 +533,8 @@ function App() {
             disabled={historyIndex >= navigationHistory.length - 1}
             className={`h-7 w-7 flex items-center justify-center rounded transition-colors ${
               historyIndex < navigationHistory.length - 1
-                ? "text-[#e8e8e8] hover:bg-[#2a2a2a] cursor-pointer" 
-                : "text-[#4a4a4a] cursor-not-allowed"
+                ? "text-[#e6edf3] hover:bg-[#2a2a2a] cursor-pointer" 
+                : "text-[#3a3a3a] cursor-not-allowed"
             }`}
           >
             <ChevronRight size={16} strokeWidth={4} />
@@ -551,19 +544,19 @@ function App() {
         <div className="flex items-center ml-auto" style={{ WebkitAppRegion: 'no-drag' } as any}>
           <button
             onClick={() => appWindow.minimize()}
-            className="h-10 w-12 flex items-center justify-center text-[#808080] hover:text-[#e8e8e8] hover:bg-[#2a2a2a] transition-colors"
+            className="h-10 w-12 flex items-center justify-center text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#2a2a2a] transition-colors"
           >
             <Minus size={16} />
           </button>
           <button
             onClick={() => appWindow.toggleMaximize()}
-            className="h-10 w-12 flex items-center justify-center text-[#808080] hover:text-[#e8e8e8] hover:bg-[#2a2a2a] transition-colors"
+            className="h-10 w-12 flex items-center justify-center text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#2a2a2a] transition-colors"
           >
             <Square size={14} />
           </button>
           <button
             onClick={() => appWindow.close()}
-            className="h-10 w-12 flex items-center justify-center text-[#808080] hover:text-[#e8e8e8] hover:bg-red-500 transition-colors"
+            className="h-10 w-12 flex items-center justify-center text-[#7d8590] hover:text-[#e6edf3] hover:bg-red-500 transition-colors"
           >
             <X size={16} />
           </button>
@@ -667,8 +660,8 @@ function App() {
                 }}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded text-[15px] font-medium transition-all cursor-pointer ${
                   activeTab === "home"
-                    ? "bg-[#2a2a2a] text-[#e8e8e8] shadow-sm"
-                    : "text-[#808080] hover:text-[#e8e8e8] hover:bg-[#1f1f1f]"
+                    ? "bg-[#212121] text-[#e6edf3]"
+                    : "text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#171717]"
                 }`}
               >
                 <Home size={19} strokeWidth={2} />
@@ -681,8 +674,8 @@ function App() {
                 }}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded text-[15px] font-medium transition-all cursor-pointer ${
                   activeTab === "instances"
-                    ? "bg-[#2a2a2a] text-[#e8e8e8] shadow-sm"
-                    : "text-[#808080] hover:text-[#e8e8e8] hover:bg-[#1f1f1f]"
+                    ? "bg-[#212121] text-[#e6edf3]"
+                    : "text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#171717]"
                 }`}
               >
                 <Package size={19} strokeWidth={2} />
@@ -695,8 +688,8 @@ function App() {
                 }}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded text-[15px] font-medium transition-all cursor-pointer ${
                   activeTab === "browse"
-                    ? "bg-[#2a2a2a] text-[#e8e8e8] shadow-sm"
-                    : "text-[#808080] hover:text-[#e8e8e8] hover:bg-[#1f1f1f]"
+                    ? "bg-[#212121] text-[#e6edf3]"
+                    : "text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#171717]"
                 }`}
               >
                 <Puzzle size={19} strokeWidth={2} />
@@ -709,8 +702,8 @@ function App() {
                 }}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded text-[15px] font-medium transition-all cursor-pointer ${
                   activeTab === "servers"
-                    ? "bg-[#2a2a2a] text-[#e8e8e8] shadow-sm"
-                    : "text-[#808080] hover:text-[#e8e8e8] hover:bg-[#1f1f1f]"
+                    ? "bg-[#212121] text-[#e6edf3]"
+                    : "text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#171717]"
                 }`}
               >
                 <Server size={19} strokeWidth={2} />
@@ -723,8 +716,8 @@ function App() {
                 }}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded text-[15px] font-medium transition-all cursor-pointer ${
                   activeTab === "skins"
-                    ? "bg-[#2a2a2a] text-[#e8e8e8] shadow-sm"
-                    : "text-[#808080] hover:text-[#e8e8e8] hover:bg-[#1f1f1f]"
+                    ? "bg-[#212121] text-[#e6edf3]"
+                    : "text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#171717]"
                 }`}
               >
                 <HatGlasses size={19} strokeWidth={2} />
@@ -738,8 +731,8 @@ function App() {
                 }}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded text-[15px] font-medium transition-all cursor-pointer ${
                   activeTab === "map"
-                    ? "bg-[#2a2a2a] text-[#e8e8e8] shadow-sm"
-                    : "text-[#808080] hover:text-[#e8e8e8] hover:bg-[#1f1f1f]"
+                    ? "bg-[#212121] text-[#e6edf3]"
+                    : "text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#171717]"
                 }`}
               >
                 <Telescope size={19} strokeWidth={2} />
@@ -753,8 +746,8 @@ function App() {
                 }}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded text-[15px] font-medium transition-all cursor-pointer ${
                   activeTab === "console"
-                    ? "bg-[#2a2a2a] text-[#e8e8e8] shadow-sm"
-                    : "text-[#808080] hover:text-[#e8e8e8] hover:bg-[#1f1f1f]"
+                    ? "bg-[#212121] text-[#e6edf3]"
+                    : "text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#171717]"
                 }`}
               >
                 <Terminal size={19} strokeWidth={2} />
@@ -765,7 +758,7 @@ function App() {
             {recentInstances.length > 0 && (
               <div className="flex-1 overflow-y-auto px-2 pb-3">
                 <div className="py-2">
-                  <h3 className="text-xs font-semibold text-[#808080] uppercase tracking-wider mb-2 px-2">
+                  <h3 className="text-xs font-semibold text-[#7d8590] uppercase tracking-wider mb-2 px-2">
                     Recently Played
                   </h3>
                   <div className="space-y-1">
@@ -782,7 +775,7 @@ function App() {
                             setShowInstanceDetails(true)
                           }}
                           onContextMenu={(e) => handleSidebarContextMenu(e, instance)}
-                          className="group w-full flex items-center gap-2 rounded cursor-pointer transition-all text-[#808080] hover:text-[#e8e8e8] hover:bg-[#1f1f1f] px-1.5 py-1.5"
+                          className="group w-full flex items-center gap-2 rounded cursor-pointer transition-all text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#171717] px-1.5 py-1.5"
                         >
                           {icon ? (
                             <img
@@ -791,47 +784,47 @@ function App() {
                               className="w-9 h-9 rounded object-cover flex-shrink-0"
                             />
                           ) : (
-                            <div className="w-9 h-9 flex items-center justify-center flex-shrink-0 bg-[#0d0d0d] rounded">
-                              <Package size={24} className="text-[#4a4a4a]" strokeWidth={1.5} />
+                            <div className="w-9 h-9 flex items-center justify-center flex-shrink-0 bg-[#101010] rounded">
+                              <Package size={24} className="text-[#3a3a3a]" strokeWidth={1.5} />
                             </div>
                           )}
                           <div className="flex-1 min-w-0 text-left">
-                            <div className="text-sm font-medium text-[#e8e8e8] truncate leading-tight">
+                            <div className="text-sm font-medium text-[#e6edf3] truncate leading-tight">
                               {instance.name}
                             </div>
-                            <div className="flex items-center gap-1 text-xs text-[#808080] leading-tight mt-0.5">
+                            <div className="flex items-center gap-1 text-xs text-[#7d8590] leading-tight mt-0.5">
                               <span className="truncate">{getMinecraftVersion(instance)}</span>
                               <span>•</span>
                               <span className="truncate">{formatLastPlayed(instance.last_played!)}</span>
                             </div>
                           </div>
-                            {isAuthenticated && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (isRunning) {
-                                    handleKillInstance(instance)
-                                  } else {
-                                    handleQuickLaunch(instance)
-                                  }
-                                }}
-                                disabled={launchingInstanceName !== null}
-                                className={`opacity-0 group-hover:opacity-100 flex-shrink-0 w-8 h-8 flex items-center justify-center rounded transition-all cursor-pointer mr-1 ${
-                                  isRunning || isLaunching
-                                    ? "bg-red-500/10 text-red-400 opacity-100 hover:bg-red-500/20"
-                                    : "bg-[#16a34a]/10 hover:bg-[#16a34a]/20 text-[#16a34a]"
-                                } disabled:opacity-50`}
-                                title={isRunning ? "Stop instance" : "Launch instance"}
-                              >
-                                {isLaunching ? (
-                                  <div className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
-                                ) : isRunning ? (
-                                  <div className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
-                                ) : (
-                                  <Play size={16} fill="currentColor" strokeWidth={0} />
-                                )}
-                              </button>
-                            )}
+                          {isAuthenticated && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (isRunning) {
+                                  handleKillInstance(instance)
+                                } else {
+                                  handleQuickLaunch(instance)
+                                }
+                              }}
+                              disabled={launchingInstanceName !== null}
+                              className={`opacity-0 group-hover:opacity-100 flex-shrink-0 w-8 h-8 flex items-center justify-center rounded transition-all cursor-pointer mr-1 ${
+                                isRunning || isLaunching
+                                  ? "bg-red-500/10 text-red-400 opacity-100 hover:bg-red-500/20"
+                                  : "bg-[#16a34a]/10 hover:bg-[#16a34a]/20 text-[#16a34a]"
+                              } disabled:opacity-50`}
+                              title={isRunning ? "Stop instance" : "Launch instance"}
+                            >
+                              {isLaunching ? (
+                                <div className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                              ) : isRunning ? (
+                                <div className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                              ) : (
+                                <Play size={16} fill="currentColor" strokeWidth={0} />
+                              )}
+                            </button>
+                          )}
                         </button>
                       )
                     })}
@@ -847,7 +840,7 @@ function App() {
                 <div className="relative py-1 mb-0.5">
                   <button
                     onClick={() => setShowAccountDropdown(!showAccountDropdown)}
-                    className="w-full flex items-center gap-2.5 p-2 cursor-pointer hover:bg-[#1f1f1f] rounded transition-colors"
+                    className="w-full flex items-center gap-2.5 p-2 cursor-pointer hover:bg-[#171717] rounded transition-colors"
                   >
                     <div className="relative">
                       <img
@@ -857,10 +850,10 @@ function App() {
                       />
                     </div>
                     <div className="flex-1 min-w-0 text-left">
-                      <div className="text-xs text-[#808080]">Welcome back,</div>
-                      <div className="text-sm font-medium text-[#e8e8e8] truncate">{activeAccount.username}</div>
+                      <div className="text-xs text-[#7d8590]">Welcome back,</div>
+                      <div className="text-sm font-medium text-[#e6edf3] truncate">{activeAccount.username}</div>
                     </div>
-                    <div className="flex flex-col text-[#808080]">
+                    <div className="flex flex-col text-[#7d8590]">
                       <ChevronUp size={14} strokeWidth={2.5} />
                       <ChevronDown size={14} strokeWidth={2.5} />
                     </div>
@@ -873,14 +866,14 @@ function App() {
                         onClick={() => setShowAccountDropdown(false)}
                       />
                       
-                      <div className="absolute bottom-1 left-0 right-0 bg-[#1a1a1a] rounded shadow-xl z-50 overflow-hidden">
+                      <div className="absolute bottom-1 left-0 right-0 bg-[#1a1a1a] rounded shadow-xl z-50 overflow-hidden border border-[#2a2a2a]">
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
                             handleAddAccount()
                           }}
                           disabled={isLoggingIn}
-                          className="w-full flex items-center gap-2 px-2.5 py-2.5 text-sm text-[#e8e8e8] hover:bg-[#1f1f1f] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full flex items-center gap-2 px-2.5 py-2.5 text-sm text-[#e6edf3] hover:bg-[#1f1f1f] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <LogIn size={18} className="text-[#16a34a]" />
                           <span>{isLoggingIn ? 'Authenticating...' : 'Add another account'}</span>
@@ -907,10 +900,10 @@ function App() {
                                         className="w-8 h-8 rounded"
                                       />
                                       <div className="flex-1 min-w-0 text-left">
-                                        <div className="text-sm font-medium text-[#e8e8e8] truncate">
+                                        <div className="text-sm font-medium text-[#e6edf3] truncate">
                                           {account.username}
                                         </div>
-                                        <div className="text-xs text-[#808080]">
+                                        <div className="text-xs text-[#7d8590]">
                                           Last used: {formatLastUsed(account.last_used)}
                                         </div>
                                       </div>
@@ -928,7 +921,6 @@ function App() {
                           </>
                         )}
 
-                        {/* Current Active Account */}
                         <div className="flex items-center gap-2.5 p-2 bg-[#2a2a2a] group">
                           <div className="flex-1 flex items-center gap-2.5">
                             <img
@@ -937,12 +929,11 @@ function App() {
                               className="w-8 h-8 rounded"
                             />
                             <div className="flex-1 min-w-0 text-left">
-                              <div className="text-xs text-[#808080]">Welcome back,</div>
-                              <div className="text-sm font-medium text-[#e8e8e8] truncate">{activeAccount.username}</div>
+                              <div className="text-xs text-[#7d8590]">Welcome back,</div>
+                              <div className="text-sm font-medium text-[#e6edf3] truncate">{activeAccount.username}</div>
                             </div>
                           </div>
                           
-                          {/* Logout Current Account Button */}
                           <button
                             onClick={() => handleRemoveAccount(activeAccount.uuid)}
                             className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/10 rounded transition-all cursor-pointer"
@@ -959,7 +950,7 @@ function App() {
               <button
                 onClick={handleAddAccount}
                 disabled={isLoggingIn}
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded text-base font-medium transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mb-2 text-[#808080] hover:text-[#e8e8e8] hover:bg-[#1f1f1f]"
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded text-base font-medium transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mb-2 text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#171717]"
               >
                 <LogIn size={20} className="text-[#16a34a]" strokeWidth={2} />
                 <span>{isLoggingIn ? 'Authenticating...' : 'Sign In'}</span>
@@ -968,7 +959,7 @@ function App() {
             
             <button
               onClick={() => setShowSettingsModal(true)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded text-base font-medium transition-all cursor-pointer mb-1 text-[#808080] hover:text-[#e8e8e8] hover:bg-[#1f1f1f]"
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded text-base font-medium transition-all cursor-pointer mb-1 text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#171717]"
             >
               <Settings size={18} strokeWidth={2} />
               <span>Settings</span>
@@ -976,8 +967,7 @@ function App() {
           </div>
         </aside>
 
-        {/* Main Content */}
-        <main className="flex-1 overflow-y-auto bg-[#0d0d0d]">
+        <main className="flex-1 overflow-y-auto bg-[#101010]">
           {showInstanceDetails && selectedInstance ? (
             <InstanceDetailsTab
               instance={selectedInstance}
