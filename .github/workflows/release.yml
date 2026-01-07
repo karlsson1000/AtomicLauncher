@@ -44,6 +44,6 @@ jobs:
           MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
         with:
           tagName: __VERSION__
-          releaseName: 'Atomic Launcher __VERSION__'
+          releaseName: 'Atomic Launcher ${{ github.ref_name }}'
           releaseDraft: false
           prerelease: false
