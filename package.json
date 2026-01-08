@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "node scripts/get-version.cjs && tauri",
+    "tauri": "tauri",
     "tauri:build": "node scripts/get-version.cjs && tauri build"
   },
   "dependencies": {
