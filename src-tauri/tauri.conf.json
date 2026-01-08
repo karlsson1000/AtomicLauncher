@@ -31,7 +31,6 @@
     "active": true,
     "targets": [
       "nsis",
-      "msi",
       "app",
       "deb"
     ],
@@ -42,6 +41,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "createUpdaterArtifacts": true,
     "windows": {
       "nsis": {
         "installerIcon": "icons/icon.ico",
