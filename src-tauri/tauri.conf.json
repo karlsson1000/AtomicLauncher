@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Atomic Launcher",
-  "version": "26.1.7",
+  "version": "26.1.8",
   "identifier": "dev.karlsson.atomic-launcher",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -55,7 +55,7 @@
         "https://github.com/karlsson1000/AtomicLauncher/releases/latest/download/latest.json"
       ],
       "dialog": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkxQTRBODZCODAxOTZEQ0QKUldUTmJSbUFhNmlra1kreWRkOTB0VFJMc05YSDRGNlNRY2Iwem1NME5XZWNHQkhaWWxSeHZwWWwK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDczNERFNjZCNEY5NzQ5NjAKUldSZ1NaZFBhK1pOY3dCeUxBaisrV2lnaE93ampHeDNnN3hkeDU2ci9VUWV3Wjl6OGxPY1JqeGYK"
     }
   }
 }
