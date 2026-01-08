@@ -42,9 +42,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+          CI: true
           GITHUB_REF_NAME: ${{ github.ref_name }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Atomic Launcher ${{ github.ref_name }}'
+          releaseBody: ''
           releaseDraft: false
           prerelease: false
