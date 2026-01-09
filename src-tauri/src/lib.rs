@@ -8,6 +8,9 @@ mod discord_rpc;
 use discord_rpc::DiscordRpc;
 use std::sync::Arc;
 use tauri_plugin_updater::UpdaterExt;
+use services::accounts::AccountManager;
+use services::friends::FriendsService;
+use models::FriendStatus;
 
 use commands::{
     // Auth commands
@@ -17,6 +20,17 @@ use commands::{
     get_active_account,
     switch_account,
     remove_account,
+    
+    // Friends commands
+    send_friend_request,
+    get_friend_requests,
+    accept_friend_request,
+    reject_friend_request,
+    get_friends,
+    remove_friend,
+    update_user_status,
+    update_specific_user_status,
+    register_user_in_friends_system,
     
     // Instance commands
     create_instance,
@@ -121,9 +135,13 @@ fn get_app_version() -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Load environment variables from .env file
+    if let Err(e) = dotenvy::dotenv() {
+        eprintln!("Warning: Could not load .env file: {}", e);
+    }
+
     let discord_rpc = Arc::new(DiscordRpc::new("1457530211968221184"));
     
-    // Set the presence once when app starts
     discord_rpc.set_activity(
         "Playing Minecraft",
         None,
@@ -136,7 +154,6 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            // Check for updates on startup
             #[cfg(all(desktop, not(debug_assertions)))]
             {
                 let handle = app.handle().clone();
@@ -180,6 +197,42 @@ pub fn run() {
             }
             Ok(())
         })
+        .on_window_event(|window, event| {
+            match event {
+                tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed => {
+                    println!("Window closing, setting user status to offline...");
+                    
+                    // Create a new runtime for the blocking operation
+                    let runtime = tokio::runtime::Runtime::new().unwrap();
+                    runtime.block_on(async {
+                        match AccountManager::get_active_account() {
+                            Ok(Some(account)) => {
+                                println!("Setting {} to offline", account.username);
+                                match FriendsService::new() {
+                                    Ok(service) => {
+                                        if let Err(e) = service.update_status(&account.uuid, FriendStatus::Offline, None).await {
+                                            eprintln!("Failed to set user offline: {}", e);
+                                        } else {
+                                            println!("Successfully set user to offline");
+                                        }
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Failed to initialize friends service: {}", e);
+                                    }
+                                }
+                            }
+                            Ok(None) => {
+                                println!("No active account to set offline");
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to get active account: {}", e);
+                            }
+                        }
+                    });
+                }
+                _ => {}
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             // App info
             get_app_version,
@@ -194,6 +247,17 @@ pub fn run() {
             launch_instance_with_active_account,
             get_launch_token,
             refresh_account_token,
+            
+            // Friends System
+            send_friend_request,
+            get_friend_requests,
+            accept_friend_request,
+            reject_friend_request,
+            get_friends,
+            remove_friend,
+            update_user_status,
+            update_specific_user_status,
+            register_user_in_friends_system,
             
             // Skin Management
             upload_skin,
