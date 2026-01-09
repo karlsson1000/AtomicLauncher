@@ -287,7 +287,7 @@ function App() {
       })
       await loadInstances()
       setRunningInstances((prev) => new Set(prev).add(instance.name))
-
+      setLaunchingInstanceName(null)
     } catch (error) {
       console.error("Launch error:", error)
       setLaunchingInstanceName(null)
@@ -582,6 +582,7 @@ function App() {
               instance={selectedInstance}
               isAuthenticated={isAuthenticated}
               isLaunching={launchingInstanceName === selectedInstance.name}
+              isRunning={runningInstances.has(selectedInstance.name)}
               onLaunch={() => handleLaunch(selectedInstance)}
               onBack={handleCloseDetails}
               onInstanceUpdated={loadInstances}
