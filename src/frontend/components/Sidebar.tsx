@@ -680,9 +680,12 @@ export function Sidebar(props: SidebarProps) {
           >
             {/* Active Account */}
             {activeAccount && (
-              <>
-                <div className="bg-[#0d0d0d] border-b border-[#2a2a2a]">
-                  <div className="flex items-center gap-2 p-2.5">
+              <div className="bg-[#0d0d0d] group">
+                <div className="flex items-center gap-2 p-2.5">
+                  <button
+                    onClick={() => setShowAccountDropdown(false)}
+                    className="flex-1 flex items-center gap-2.5 cursor-pointer"
+                  >
                     <img
                       src={`https://cravatar.eu/avatar/${activeAccount.username}/32`}
                       alt={activeAccount.username}
@@ -696,9 +699,15 @@ export function Sidebar(props: SidebarProps) {
                         Active Account
                       </div>
                     </div>
-                  </div>
+                  </button>
+                  <button
+                    onClick={() => handleRemoveAccount(activeAccount.uuid)}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/10 rounded transition-all cursor-pointer"
+                  >
+                    <LogOut size={16} className="text-red-400" />
+                  </button>
                 </div>
-              </>
+              </div>
             )}
 
             {/* Other Accounts */}
