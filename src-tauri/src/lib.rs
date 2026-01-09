@@ -11,6 +11,7 @@ use tauri_plugin_updater::UpdaterExt;
 use services::accounts::AccountManager;
 use services::friends::FriendsService;
 use models::FriendStatus;
+use serde::Serialize;
 
 use commands::{
     // Auth commands
@@ -128,14 +129,67 @@ use commands::{
     open_url,
 };
 
+#[derive(Clone, Serialize)]
+struct UpdateInfo {
+    current_version: String,
+    new_version: String,
+}
+
 #[tauri::command]
 fn get_app_version() -> String {
     include_str!("../commit_hash.txt").trim().to_string()
 }
 
+#[tauri::command]
+async fn check_for_updates(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
+    match app.updater() {
+        Ok(updater) => {
+            match updater.check().await {
+                Ok(Some(update)) => {
+                    let current_version = app.package_info().version.to_string();
+                    let new_version = update.version.clone();
+                    
+                    Ok(Some(UpdateInfo {
+                        current_version,
+                        new_version,
+                    }))
+                }
+                Ok(None) => Ok(None),
+                Err(e) => Err(format!("Failed to check for updates: {}", e))
+            }
+        }
+        Err(e) => Err(format!("Failed to get updater: {}", e))
+    }
+}
+
+#[tauri::command]
+async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    match app.updater() {
+        Ok(updater) => {
+            match updater.check().await {
+                Ok(Some(update)) => {
+                    let mut downloaded = 0;
+                    
+                    match update.download_and_install(
+                        |chunk_length, content_length| {
+                            downloaded += chunk_length;
+                        },
+                        || {},
+                    ).await {
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(format!("Failed to install update: {}", e))
+                    }
+                }
+                Ok(None) => Err("No update available".to_string()),
+                Err(e) => Err(format!("Failed to check for updates: {}", e))
+            }
+        }
+        Err(e) => Err(format!("Failed to get updater: {}", e))
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Load environment variables from .env file
     if let Err(e) = dotenvy::dotenv() {
         eprintln!("Warning: Could not load .env file: {}", e);
     }
@@ -153,80 +207,25 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
-        .setup(|app| {
-            #[cfg(all(desktop, not(debug_assertions)))]
-            {
-                let handle = app.handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    match handle.updater() {
-                        Ok(updater) => {
-                            match updater.check().await {
-                                Ok(Some(update)) => {
-                                    println!("Update available: {}", update.version);
-                                    let mut downloaded = 0;
-                                    
-                                    match update.download_and_install(
-                                        |chunk_length, content_length| {
-                                            downloaded += chunk_length;
-                                            if let Some(total) = content_length {
-                                                let percent = (downloaded as f64 / total as f64 * 100.0) as u32;
-                                                println!("Downloaded {}% ({}/{})", percent, downloaded, total);
-                                            }
-                                        },
-                                        || {
-                                            println!("Download finished, installing update...");
-                                        },
-                                    ).await {
-                                        Ok(_) => println!("Update installed successfully!"),
-                                        Err(e) => eprintln!("Failed to install update: {}", e),
-                                    }
-                                }
-                                Ok(None) => {
-                                    println!("No updates available");
-                                }
-                                Err(e) => {
-                                    eprintln!("Failed to check for updates: {}", e);
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to get updater: {}", e);
-                        }
-                    }
-                });
-            }
+        .setup(|_app| {
             Ok(())
         })
         .on_window_event(|window, event| {
             match event {
                 tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed => {
-                    println!("Window closing, setting user status to offline...");
-                    
-                    // Create a new runtime for the blocking operation
                     let runtime = tokio::runtime::Runtime::new().unwrap();
                     runtime.block_on(async {
                         match AccountManager::get_active_account() {
                             Ok(Some(account)) => {
-                                println!("Setting {} to offline", account.username);
                                 match FriendsService::new() {
                                     Ok(service) => {
-                                        if let Err(e) = service.update_status(&account.uuid, FriendStatus::Offline, None).await {
-                                            eprintln!("Failed to set user offline: {}", e);
-                                        } else {
-                                            println!("Successfully set user to offline");
-                                        }
+                                        let _ = service.update_status(&account.uuid, FriendStatus::Offline, None).await;
                                     }
-                                    Err(e) => {
-                                        eprintln!("Failed to initialize friends service: {}", e);
-                                    }
+                                    Err(_) => {}
                                 }
                             }
-                            Ok(None) => {
-                                println!("No active account to set offline");
-                            }
-                            Err(e) => {
-                                eprintln!("Failed to get active account: {}", e);
-                            }
+                            Ok(None) => {}
+                            Err(_) => {}
                         }
                     });
                 }
@@ -236,6 +235,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             // App info
             get_app_version,
+            check_for_updates,
+            install_update,
             
             // Authentication
             microsoft_login,

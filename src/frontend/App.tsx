@@ -12,6 +12,7 @@ import { ServersTab } from "./tabs/ServersTab"
 import { SkinsTab } from "./tabs/SkinsTab"
 import { CreateInstanceModal } from "./modals/CreateInstanceModal"
 import { CreationProgressToast } from "./modals/CreationProgressToast"
+import { UpdateNotificationToast } from "./modals/UpdateNotificationToast"
 import { InstanceDetailsTab } from "./modals/InstanceDetailsTab"
 import { ConfirmModal, AlertModal } from "./modals/ConfirmModal"
 import { MapTab } from "./tabs/MapTab"
@@ -24,6 +25,11 @@ interface AccountInfo {
   is_active: boolean
   added_at: string
   last_used: string | null
+}
+
+interface UpdateInfo {
+  current_version: string
+  new_version: string
 }
 
 function App() {
@@ -67,6 +73,9 @@ function App() {
     y: number
     instance: Instance
   } | null>(null)
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
+  const [showUpdateNotification, setShowUpdateNotification] = useState(false)
+  const [isInstallingUpdate, setIsInstallingUpdate] = useState(false)
 
   const appWindow = getCurrentWindow()
 
@@ -111,6 +120,52 @@ function App() {
     }
   }
 
+  const checkForUpdates = async () => {
+    try {
+      const update = await invoke<UpdateInfo | null>("check_for_updates")
+      if (update) {
+        console.log("Update available:", update)
+        
+        // Check if user has dismissed this version before
+        const dismissedVersion = localStorage.getItem("dismissed_update_version")
+        if (dismissedVersion !== update.new_version) {
+          setUpdateInfo(update)
+          setShowUpdateNotification(true)
+        }
+      }
+    } catch (error) {
+      console.error("Failed to check for updates:", error)
+    }
+  }
+
+  const handleInstallUpdate = async () => {
+    if (!updateInfo) return
+    
+    setIsInstallingUpdate(true)
+    try {
+      await invoke("install_update")
+      // The app will restart automatically after successful installation
+    } catch (error) {
+      console.error("Failed to install update:", error)
+      setAlertModal({
+        isOpen: true,
+        title: "Update Failed",
+        message: `Failed to install update: ${error}`,
+        type: "danger"
+      })
+      setIsInstallingUpdate(false)
+      setShowUpdateNotification(false)
+    }
+  }
+
+  const handleUpdateLater = () => {
+    if (updateInfo) {
+      // Store the dismissed version so we don't show it again this session
+      localStorage.setItem("dismissed_update_version", updateInfo.new_version)
+    }
+    setShowUpdateNotification(false)
+  }
+
   const tabs = [
     { id: "home" as const, icon: Home, label: "Home" },
     { id: "instances" as const, icon: Package, label: "Instances" },
@@ -136,6 +191,9 @@ function App() {
           splash.remove()
         }, 500)
       }
+
+      // Check for updates after app is ready
+      checkForUpdates()
     }
     
     initializeApp()
@@ -525,6 +583,16 @@ function App() {
           onComplete={handleCreationComplete}
           onError={handleCreationError}
           onDismiss={() => setCreatingInstanceName(null)}
+        />
+      )}
+
+      {showUpdateNotification && updateInfo && (
+        <UpdateNotificationToast
+          currentVersion={updateInfo.current_version}
+          newVersion={updateInfo.new_version}
+          isInstalling={isInstallingUpdate}
+          onInstall={handleInstallUpdate}
+          onLater={handleUpdateLater}
         />
       )}
 
