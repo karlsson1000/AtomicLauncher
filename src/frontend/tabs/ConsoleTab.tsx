@@ -120,9 +120,6 @@ export function ConsoleTab({ consoleLogs, onClearConsole }: ConsoleTabProps) {
 
         {/* Action Buttons */}
         <div className="flex items-center justify-end gap-2 mt-4">
-
-        {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-2">
           <button
             onClick={handleUploadToMcLogs}
             disabled={consoleLogs.length === 0 || uploadState.loading}
@@ -162,7 +159,6 @@ export function ConsoleTab({ consoleLogs, onClearConsole }: ConsoleTabProps) {
             <Trash2 size={16} strokeWidth={2} />
             <span>Clear</span>
           </button>
-        </div>
         </div>
       </div>
     </div>
