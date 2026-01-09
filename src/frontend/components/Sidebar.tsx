@@ -346,7 +346,7 @@ export function Sidebar(props: SidebarProps) {
       case "online":
         return "bg-green-500"
       case "ingame":
-        return "bg-blue-500"
+        return "bg-green-500"
       case "offline":
         return "bg-gray-500"
     }
@@ -438,7 +438,7 @@ export function Sidebar(props: SidebarProps) {
                           setShowInstanceDetails(true)
                         }}
                         onContextMenu={(e) => handleSidebarContextMenu(e, instance)}
-                        className="group w-full flex items-center gap-2 rounded cursor-pointer transition-all text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#171717] px-1.5 py-1.5"
+                        className="group w-full flex items-center gap-2 rounded cursor-pointer transition-all text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#171717] px-1.5 py-1.5 relative"
                       >
                         {icon ? (
                           <img
@@ -451,14 +451,12 @@ export function Sidebar(props: SidebarProps) {
                             <Package size={24} className="text-[#3a3a3a]" strokeWidth={1.5} />
                           </div>
                         )}
-                        <div className="flex-1 min-w-0 text-left">
+                        <div className="flex-1 min-w-0 text-left group-hover:pr-10 transition-all">
                           <div className="text-sm font-medium text-[#e6edf3] truncate leading-tight">
                             {instance.name}
                           </div>
-                          <div className="flex items-center gap-1 text-xs text-[#7d8590] leading-tight mt-0.5">
-                            <span className="truncate">{getMinecraftVersion(instance)}</span>
-                            <span>•</span>
-                            <span className="truncate">{formatLastPlayed(instance.last_played!)}</span>
+                          <div className="text-xs text-[#7d8590] leading-tight mt-0.5 truncate">
+                            {getMinecraftVersion(instance)} • {formatLastPlayed(instance.last_played!)}
                           </div>
                         </div>
                         {isAuthenticated && (
@@ -472,7 +470,7 @@ export function Sidebar(props: SidebarProps) {
                               }
                             }}
                             disabled={launchingInstanceName !== null}
-                            className={`opacity-0 group-hover:opacity-100 flex-shrink-0 w-8 h-8 flex items-center justify-center rounded transition-all cursor-pointer mr-1 ${
+                            className={`absolute right-1.5 opacity-0 group-hover:opacity-100 flex-shrink-0 w-8 h-8 flex items-center justify-center rounded transition-all cursor-pointer ${
                               isRunning || isLaunching
                                 ? "bg-red-500/10 text-red-400 opacity-100 hover:bg-red-500/20"
                                 : "bg-[#16a34a]/10 hover:bg-[#16a34a]/20 text-[#16a34a]"
@@ -620,34 +618,34 @@ export function Sidebar(props: SidebarProps) {
                       return (
                         <div
                           key={statusKey}
-                          className="group flex items-center gap-2 px-1.5 py-1.5 rounded cursor-pointer hover:bg-[#171717] transition-all"
+                          className="group relative flex items-center gap-2 px-1.5 py-1.5 rounded cursor-pointer hover:bg-[#171717] transition-all"
                         >
                           <div className="relative flex-shrink-0">
                             <img
                               src={`https://cravatar.eu/avatar/${friend.username}/32`}
                               alt={friend.username}
-                              className="w-7 h-7 rounded"
+                              className="w-8 h-8 rounded"
                             />
                             <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#1a1a1a] ${getStatusColor(friend.status)}`} />
                           </div>
-                          <div className="flex-1 min-w-0">
+                          <div className="flex-1 min-w-0 group-hover:pr-6 transition-all">
                             <div className="text-sm font-medium text-[#e6edf3] truncate leading-tight">
                               {friend.username}
                             </div>
                             <div className="flex items-center gap-1 text-xs text-[#7d8590] truncate leading-tight">
-                              <span>
+                              {friend.status === "ingame" && (
+                                <Gamepad2 size={14} className="flex-shrink-0 text-green-400" />
+                              )}
+                              <span className="truncate">
                                 {friend.status === "online" ? "Online" : 
-                                 friend.status === "ingame" ? (friend.current_instance ? `Playing ${friend.current_instance}` : "In Game") :
+                                 friend.status === "ingame" ? (friend.current_instance || "In Game") :
                                  "Offline"}
                               </span>
-                              {friend.status === "ingame" && (
-                                <Gamepad2 size={14} className="flex-shrink-0" />
-                              )}
                             </div>
                           </div>
                           <button
                             onClick={() => handleRemoveFriend(friend.uuid, friend.username)}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/10 rounded transition-all cursor-pointer"
+                            className="absolute right-1.5 opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/10 rounded transition-all cursor-pointer bg-[#171717]"
                             title="Remove Friend"
                           >
                             <X size={14} className="text-red-400" />
