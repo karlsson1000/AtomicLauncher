@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react"
-import * as skinview3d from "skinview3d"
 import { Upload, RotateCcw, Loader2, HatGlasses, ChevronDown } from "lucide-react"
 
 interface SkinsTabProps {
@@ -30,9 +29,6 @@ interface Cape {
 
 export function SkinsTab(props: SkinsTabProps) {
   const { activeAccount, isAuthenticated, invoke } = props
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const viewerRef = useRef<any>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -43,6 +39,9 @@ export function SkinsTab(props: SkinsTabProps) {
   const [loadingCapes, setLoadingCapes] = useState(false)
   const [recentSkins, setRecentSkins] = useState<RecentSkin[]>([])
   const [capesExpanded, setCapesExpanded] = useState(false)
+  const [currentSkinHash, setCurrentSkinHash] = useState<string | null>(null)
+  const [showCape, setShowCape] = useState(true)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const skinCacheRef = useRef<Map<string, CachedSkin>>(new Map())
   const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
@@ -102,60 +101,8 @@ export function SkinsTab(props: SkinsTabProps) {
   }
 
   useEffect(() => {
-    if (!canvasRef.current) return
-
-    const viewer = new skinview3d.SkinViewer({
-      canvas: canvasRef.current,
-      width: 300,
-      height: 500,
-    })
-
-    viewer.background = 0x101010
-    viewer.renderer.setClearColor(0x101010, 1)
-    viewer.zoom = 0.8
-    viewer.autoRotate = true
-    viewer.autoRotateSpeed = 0.2
-    viewer.globalLight.intensity = 2.5
-    viewer.cameraLight.intensity = 3.0
-    
-    viewerRef.current = viewer
-    loadUserSkin(viewer)
-
-    return () => {
-      if (viewerRef.current) {
-        viewerRef.current.dispose()
-      }
-    }
+    loadUserSkin()
   }, [activeAccount])
-  
-  useEffect(() => {
-    if (!viewerRef.current) return
-    
-    let animationId: number
-    let lastTime = performance.now()
-    
-    function animate(currentTime: number) {
-      if (viewerRef.current) {
-        const deltaTime = currentTime - lastTime
-        lastTime = currentTime
-        
-        if (viewerRef.current.autoRotate) {
-          viewerRef.current.playerObject.rotation.y += (viewerRef.current.autoRotateSpeed * deltaTime) / 1000
-        }
-        
-        viewerRef.current.render()
-        animationId = requestAnimationFrame(animate)
-      }
-    }
-    
-    animationId = requestAnimationFrame(animate)
-    
-    return () => {
-      if (animationId) {
-        cancelAnimationFrame(animationId)
-      }
-    }
-  }, [viewerRef.current])
 
   const getCapeImageName = (alias: string) => {
     const specialCases: Record<string, string> = {
@@ -172,7 +119,7 @@ export function SkinsTab(props: SkinsTabProps) {
     return lowerAlias.replace(/\s+/g, '_').replace(/['']/g, '')
   }
 
-  const loadUserSkin = async (viewer: any) => {
+  const loadUserSkin = async () => {
     if (!isAuthenticated || !activeAccount || !invoke) {
       setLoading(false)
       setError("Please sign in to view your skin")
@@ -188,11 +135,11 @@ export function SkinsTab(props: SkinsTabProps) {
       const now = Date.now()
       
       if (cached && (now - cached.timestamp) < CACHE_DURATION) {
-        await viewer.loadSkin(cached.url, {
-          model: cached.variant === "slim" ? "slim" : "default"
-        })
+        const match = cached.url.match(/texture\/([a-f0-9]+)/)
+        if (match) {
+          setCurrentSkinHash(match[1])
+        }
         setSkinVariant(cached.variant)
-        viewer.render()
         setLoading(false)
         loadCapes()
         return
@@ -202,9 +149,11 @@ export function SkinsTab(props: SkinsTabProps) {
       
       if (skinData && skinData.url) {
         const variant = skinData.variant === "slim" ? "slim" : "classic"
-        await viewer.loadSkin(skinData.url, {
-          model: variant === "slim" ? "slim" : "default"
-        })
+        
+        const match = skinData.url.match(/texture\/([a-f0-9]+)/)
+        if (match) {
+          setCurrentSkinHash(match[1])
+        }
         
         setSkinVariant(variant)
         
@@ -214,20 +163,10 @@ export function SkinsTab(props: SkinsTabProps) {
           timestamp: now
         })
         
-        viewer.render()
         setLoading(false)
         loadCapes()
       } else {
-        const defaultSkinUrl = `https://cravatar.eu/avatar/${activeAccount.username}/128.png`
-        await viewer.loadSkin(defaultSkinUrl)
-        
-        skinCacheRef.current.set(cacheKey, {
-          url: defaultSkinUrl,
-          variant: "classic",
-          timestamp: now
-        })
-        
-        viewer.render()
+        setCurrentSkinHash(null)
         setLoading(false)
         loadCapes()
       }
@@ -235,14 +174,7 @@ export function SkinsTab(props: SkinsTabProps) {
       console.error("Failed to load skin:", err)
       setError(`Failed to load skin: ${err}`)
       setLoading(false)
-      
-      try {
-        const steveSkinUrl = "https://textures.minecraft.net/texture/31f477eb1a7beee631c2ca64d06f8f68fa93a3386d04452ab27f43acdf1b60cb"
-        await viewer.loadSkin(steveSkinUrl)
-        viewer.render()
-      } catch (fallbackErr) {
-        console.error("Fallback skin also failed:", fallbackErr)
-      }
+      setCurrentSkinHash(null)
     }
   }
 
@@ -258,15 +190,7 @@ export function SkinsTab(props: SkinsTabProps) {
         const active = capeData.capes.find((cape: Cape) => cape.state === "ACTIVE")
         const activeCapeId = active?.id || null
         setActiveCape(activeCapeId)
-
-        if (active && viewerRef.current) {
-          try {
-            await viewerRef.current.loadCape(active.url)
-            viewerRef.current.render()
-          } catch (err) {
-            console.error("Failed to load active cape in viewer:", err)
-          }
-        }
+        setShowCape(!!activeCapeId)
       }
     } catch (err) {
       console.error("Failed to load capes:", err)
@@ -275,16 +199,13 @@ export function SkinsTab(props: SkinsTabProps) {
     }
   }
 
-  const handleCapeSelect = async (capeUrl: string, capeId: string) => {
-    if (!viewerRef.current || !invoke) return
+  const handleCapeSelect = async (capeId: string) => {
+    if (!invoke) return
 
     try {
-      await viewerRef.current.loadCape(capeUrl)
-      viewerRef.current.render()
-      
       await invoke("equip_cape", { capeId })
-      
       setActiveCape(capeId)
+      setShowCape(true)
     } catch (err) {
       console.error("Failed to equip cape:", err)
       setError(`Failed to equip cape: ${err}`)
@@ -292,15 +213,12 @@ export function SkinsTab(props: SkinsTabProps) {
   }
 
   const handleCapeRemove = async () => {
-    if (!viewerRef.current || !invoke) return
+    if (!invoke) return
     
     try {
-      viewerRef.current.loadCape(null)
-      viewerRef.current.render()
-      
       await invoke("remove_cape")
-      
       setActiveCape(null)
+      setShowCape(false)
     } catch (err) {
       console.error("Failed to remove cape:", err)
       setError(`Failed to remove cape: ${err}`)
@@ -309,7 +227,7 @@ export function SkinsTab(props: SkinsTabProps) {
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file || !invoke || !viewerRef.current) return
+    if (!file || !invoke) return
 
     const reader = new FileReader()
     reader.onload = async (e) => {
@@ -329,7 +247,7 @@ export function SkinsTab(props: SkinsTabProps) {
           skinCacheRef.current.delete(activeAccount.uuid)
         }
 
-        await loadUserSkin(viewerRef.current)
+        await loadUserSkin()
         
         // Add to recent skins after successful upload
         const skinData = await invoke("get_current_skin")
@@ -349,7 +267,7 @@ export function SkinsTab(props: SkinsTabProps) {
   }
 
   const handleReset = async () => {
-    if (!invoke || !viewerRef.current) return
+    if (!invoke) return
 
     setResetting(true)
     setError(null)
@@ -361,7 +279,7 @@ export function SkinsTab(props: SkinsTabProps) {
         skinCacheRef.current.delete(activeAccount.uuid)
       }
       
-      await loadUserSkin(viewerRef.current)
+      await loadUserSkin()
     } catch (err) {
       setError(`Reset failed: ${err}`)
     } finally {
@@ -370,7 +288,7 @@ export function SkinsTab(props: SkinsTabProps) {
   }
 
   const handleRecentSkinSelect = async (skin: RecentSkin) => {
-    if (!viewerRef.current || !invoke) return
+    if (!invoke) return
 
     setUploading(true)
     setError(null)
@@ -401,7 +319,7 @@ export function SkinsTab(props: SkinsTabProps) {
         skinCacheRef.current.delete(activeAccount.uuid)
       }
 
-      await loadUserSkin(viewerRef.current)
+      await loadUserSkin()
       
       // Move to top of recent skins
       await addToRecentSkins(skin.url, skin.variant)
@@ -412,6 +330,14 @@ export function SkinsTab(props: SkinsTabProps) {
     } finally {
       setUploading(false)
     }
+  }
+
+  const getSkinRenderUrl = () => {
+    if (!currentSkinHash) return null
+    
+    const variant = skinVariant === "slim" ? "slim" : "wide"
+    const capeParam = showCape && activeCape ? "" : "&no=cape"
+    return `https://vzge.me/full/512/${currentSkinHash}?${variant}${capeParam}`
   }
 
   if (!isAuthenticated) {
@@ -445,12 +371,12 @@ export function SkinsTab(props: SkinsTabProps) {
           </div>
         </div>
 
-        <div className="flex gap-24 items-start justify-center">
-          {/* 3D Skin Viewer */}
-          <div className="flex-shrink-0">
-            <div className="rounded-md overflow-hidden relative">
+        <div className="flex gap-24 items-center justify-center">
+          {/* Skin Viewer */}
+          <div className="flex-shrink-0 self-start mt-8">
+            <div className="rounded-md overflow-hidden relative bg-[#101010] p-4">
               {loading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-[#101010] bg-opacity-90 z-10 rounded-md">
+                <div className="w-[250px] h-[406px] flex items-center justify-center bg-[#101010] rounded-md">
                   <div className="text-center">
                     <Loader2 size={32} className="animate-spin text-[#238636] mx-auto mb-3" />
                     <p className="text-sm text-[#7d8590]">Loading skin...</p>
@@ -458,12 +384,20 @@ export function SkinsTab(props: SkinsTabProps) {
                 </div>
               )}
               
-              <div className="flex items-center justify-center p-4 bg-[#101010]">
-                <canvas 
-                  ref={canvasRef}
-                  className="rounded-md"
+              {!loading && currentSkinHash && (
+                <img
+                  src={getSkinRenderUrl() || ''}
+                  alt="Minecraft skin render"
+                  className="w-[250px] h-[406px]"
+                  style={{ imageRendering: 'pixelated' }}
                 />
-              </div>
+              )}
+              
+              {!loading && !currentSkinHash && (
+                <div className="w-[300px] h-[487px] flex items-center justify-center">
+                  <p className="text-sm text-[#7d8590]">No skin loaded</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -474,16 +408,7 @@ export function SkinsTab(props: SkinsTabProps) {
               
               <div className="flex gap-2 mb-6">
                 <button
-                  onClick={() => {
-                    setSkinVariant("classic")
-                    if (viewerRef.current) {
-                      const currentSkinUrl = viewerRef.current.skinCanvas?.source?.img?.src
-                      if (currentSkinUrl) {
-                        viewerRef.current.loadSkin(currentSkinUrl, { model: "default" })
-                      }
-                      viewerRef.current.render()
-                    }
-                  }}
+                  onClick={() => setSkinVariant("classic")}
                   className={`flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition-all cursor-pointer border ${
                     skinVariant === "classic"
                       ? "bg-[#4572e3] text-white border-[#4572e3]"
@@ -493,16 +418,7 @@ export function SkinsTab(props: SkinsTabProps) {
                   Classic
                 </button>
                 <button
-                  onClick={() => {
-                    setSkinVariant("slim")
-                    if (viewerRef.current) {
-                      const currentSkinUrl = viewerRef.current.skinCanvas?.source?.img?.src
-                      if (currentSkinUrl) {
-                        viewerRef.current.loadSkin(currentSkinUrl, { model: "slim" })
-                      }
-                      viewerRef.current.render()
-                    }
-                  }}
+                  onClick={() => setSkinVariant("slim")}
                   className={`flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition-all cursor-pointer border ${
                     skinVariant === "slim"
                       ? "bg-[#4572e3] text-white border-[#4572e3]"
@@ -572,8 +488,10 @@ export function SkinsTab(props: SkinsTabProps) {
                     // Extract texture hash from URL
                     const match = skin.url.match(/texture\/([a-f0-9]+)/)
                     const hash = match ? match[1] : null
-                    // Use head avatar
-                    const renderUrl = hash ? `https://mc-heads.net/avatar/${hash}/128` : skin.url
+                    // Use bust render from VZGE
+                    const renderUrl = hash 
+                      ? `https://vzge.me/bust/128/${hash}${skin.variant === 'slim' ? '?slim' : '?wide'}`
+                      : skin.url
                     
                     return (
                       <button
@@ -585,7 +503,7 @@ export function SkinsTab(props: SkinsTabProps) {
                         <img
                           src={renderUrl}
                           alt="Recent skin"
-                          className="w-16 h-16"
+                          className="w-20 h-20"
                           style={{ imageRendering: 'pixelated' }}
                         />
                       </button>
@@ -623,7 +541,7 @@ export function SkinsTab(props: SkinsTabProps) {
                         {capes.map((cape) => (
                           <button
                             key={cape.id}
-                            onClick={() => handleCapeSelect(cape.url, cape.id)}
+                            onClick={() => handleCapeSelect(cape.id)}
                             className={`w-20 h-32 bg-[#0f0f0f] border border-[#2a2a2a] rounded-md overflow-hidden flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-[#4572e3] ${
                               activeCape === cape.id
                                 ? "ring-2 ring-[#4572e3]"
