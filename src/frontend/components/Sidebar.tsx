@@ -112,8 +112,6 @@ export function Sidebar(props: SidebarProps) {
           console.log("Registering user in friends system:", activeAccount.username)
           await invoke("register_user_in_friends_system")
           console.log("User registered successfully")
-
-          await invoke("update_user_status", { status: "online", currentInstance: null })
           
           // Load friends and requests
           await loadFriends()
@@ -133,10 +131,7 @@ export function Sidebar(props: SidebarProps) {
 
       return () => {
         clearInterval(interval)
-
       }
-    } else if (!isAuthenticated) {
-
     }
   }, [isAuthenticated, activeAccount])
 

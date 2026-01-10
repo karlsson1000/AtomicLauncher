@@ -22,15 +22,34 @@ impl FriendsService {
 
 pub async fn register_user(&self, uuid: &str, username: &str) -> Result<(), Box<dyn std::error::Error>> {
     let url = format!("{}/rest/v1/users", self.supabase_url);
-    
+        
     println!("Registering user: {} ({})", username, uuid);
-    
-    let payload = json!({
-        "uuid": uuid,
-        "username": username,
-        "last_seen": Utc::now()
-        // No status field
-    });
+        
+    // Check if user already exists and their current status
+    let check_url = format!("{}/rest/v1/users?uuid=eq.{}", self.supabase_url, uuid);
+    let existing = self.client
+        .get(&check_url)
+        .header("apikey", &self.supabase_key)
+        .header("Authorization", format!("Bearer {}", self.supabase_key))
+        .send()
+        .await?;
+        
+    let existing_users: Vec<serde_json::Value> = existing.json().await?;
+
+    let payload = if existing_users.is_empty() {
+        json!({
+            "uuid": uuid,
+            "username": username,
+            "status": "online",
+            "last_seen": Utc::now()
+        })
+    } else {
+        json!({
+            "uuid": uuid,
+            "username": username,
+            "last_seen": Utc::now()
+        })
+    };
 
     let response = self.client
         .post(&url)
