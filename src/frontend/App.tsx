@@ -724,7 +724,9 @@ function App() {
               {activeTab === "console" && (
                 <ConsoleTab
                   consoleLogs={consoleLogs}
-                  onClearConsole={() => setConsoleLogs([])}
+                  onClearConsole={(instanceName: string) => {
+                    setConsoleLogs(prev => prev.filter(log => log.instance !== instanceName))
+                  }}
                 />
               )}
             </>
