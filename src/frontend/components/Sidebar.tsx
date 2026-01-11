@@ -144,7 +144,13 @@ export function Sidebar(props: SidebarProps) {
         server: f.current_instance,
         statusText: getStatusText(f)
       })))
-      setFriends([...friendsList])
+
+      const sortedFriends = [...friendsList].sort((a, b) => {
+        const statusOrder = { ingame: 0, online: 1, offline: 2 }
+        return statusOrder[a.status] - statusOrder[b.status]
+      })
+
+      setFriends(sortedFriends)
       setFriendsUpdateKey(prev => prev + 1)
     } catch (error) {
       console.error("Failed to load friends:", error)
