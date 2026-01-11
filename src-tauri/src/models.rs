@@ -147,10 +147,16 @@ pub struct LauncherSettings {
     pub java_path: Option<String>,
     #[serde(default = "default_memory")]
     pub memory_mb: u32,
+    #[serde(default = "default_discord_rpc_enabled")]
+    pub discord_rpc_enabled: bool,
 }
 
 fn default_memory() -> u32 {
     2048
+}
+
+fn default_discord_rpc_enabled() -> bool {
+    true
 }
 
 impl Default for LauncherSettings {
@@ -158,6 +164,7 @@ impl Default for LauncherSettings {
         Self {
             java_path: None,
             memory_mb: 2048,
+            discord_rpc_enabled: true,
         }
     }
 }

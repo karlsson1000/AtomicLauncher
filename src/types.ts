@@ -30,10 +30,7 @@ export interface FabricVersion {
 export interface LauncherSettings {
   memory_mb: number
   java_path: string | null
-  width: number
-  height: number
-  fullscreen: boolean
-  jvm_args: string[]
+  discord_rpc_enabled: boolean
 }
 
 export interface ConsoleLog {

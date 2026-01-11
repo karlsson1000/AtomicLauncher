@@ -6,6 +6,7 @@ mod models;
 mod discord_rpc;
 
 use discord_rpc::DiscordRpc;
+use tauri::Manager;
 use std::sync::Arc;
 use tauri_plugin_updater::UpdaterExt;
 use services::accounts::AccountManager;
@@ -221,6 +222,29 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
     }
 }
 
+#[tauri::command]
+async fn update_discord_rpc_mode(app: tauri::AppHandle) -> Result<(), String> {
+    use crate::services::settings::SettingsManager;
+    
+    let settings = SettingsManager::load()
+        .map_err(|e| format!("Failed to load settings: {}", e))?;
+    
+    let discord_rpc: tauri::State<Arc<DiscordRpc>> = app.state();
+    
+    if settings.discord_rpc_enabled {
+        discord_rpc.set_activity(
+            "Playing Minecraft",
+            None,
+            "grass",
+            "Minecraft",
+        );
+    } else {
+        discord_rpc.clear_activity();
+    }
+    
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     if let Err(e) = dotenvy::dotenv() {
@@ -228,19 +252,30 @@ pub fn run() {
     }
 
     let discord_rpc = Arc::new(DiscordRpc::new("1457530211968221184"));
-    
-    discord_rpc.set_activity(
-        "Playing Minecraft",
-        None,
-        "atomic_launcher",
-        "Atomic Launcher",
-    );
 
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
-        .setup(|_app| {
+        .manage(discord_rpc.clone())
+        .setup(move |app| {
+            // Initialize Discord RPC based on settings
+            use crate::services::settings::SettingsManager;
+            let should_enable_rpc = match SettingsManager::load() {
+                Ok(settings) => settings.discord_rpc_enabled,
+                Err(_) => true,
+            };
+            
+            if should_enable_rpc {
+                let rpc: tauri::State<Arc<DiscordRpc>> = app.state();
+                rpc.set_activity(
+                    "Playing Minecraft",
+                    None,
+                    "grass",
+                    "Minecraft",
+                );
+            }
+            
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -355,6 +390,7 @@ pub fn run() {
             set_sidebar_background,
             get_sidebar_background,
             remove_sidebar_background,
+            update_discord_rpc_mode,
 
             // Mod Management
             get_installed_mods,
