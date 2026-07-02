@@ -5,6 +5,7 @@
   import type { RecentSkin, Cape } from "../../types"
   import { storeGet, storeSet, storeRemove } from "../../lib/store"
   import { store } from "../../lib/launcherStore.svelte"
+  import { untrack } from "svelte"
 
   const SKIN_CACHE_KEY = "octane_skin_cache"
   const CAPE_CACHE_KEY = "octane_cape_cache"
@@ -87,19 +88,6 @@
   let pendingSkinOp: { type: 'upload'; base64: string; variant: 'classic' | 'slim' } | { type: 'recent'; url: string; variant: 'classic' | 'slim' } | { type: 'reset' } | null = null
   let pendingCapeOp: { type: 'select'; capeId: string } | { type: 'remove' } | null = null
   let loadUserSkinFn: (forceRefresh?: boolean) => Promise<void> = async () => {}
-
-  $effect(() => {
-    const el = containerEl
-    if (!el) return
-    const ro = new ResizeObserver(entries => {
-      const { width, height } = entries[0].contentRect
-      containerSize = { width: Math.round(width), height: Math.round(height) }
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  })
-
-  import { untrack } from "svelte"
 
   let prevSkinUrl: string | undefined
   $effect(() => {
@@ -354,9 +342,11 @@
   // SkinViewer3D initialization
   $effect(() => {
     const canvas = canvasEl
-    if (!canvas) return
+    const container = containerEl
+    if (!canvas || !container) return
 
-    const v = new skinview3d.SkinViewer({ canvas })
+    const { width: cw, height: ch } = container.getBoundingClientRect()
+    const v = new skinview3d.SkinViewer({ canvas, width: Math.round(cw), height: Math.round(ch) })
 
     v.renderer.setClearColor(0x000000, 0)
     v.globalLight.intensity = 3.0
@@ -370,12 +360,28 @@
     v.camera.position.y += 8
     v.camera.lookAt(v.playerObject.position)
 
+    const ro = new ResizeObserver(entries => {
+      const { width, height } = entries[0].contentRect
+      containerSize = { width: Math.round(width), height: Math.round(height) }
+    })
+    ro.observe(container)
+
     viewer = v
 
     return () => {
+      ro.disconnect()
       v.dispose()
       viewer = null
     }
+  })
+
+  $effect(() => {
+    const v = viewer
+    if (!v) return
+    const { width, height } = containerSize
+    if (width < 1 || height < 1) return
+    v.setSize(width, height)
+    v.render()
   })
 
   $effect(() => {
@@ -396,14 +402,6 @@
     } else {
       v.loadCape(null)
     }
-  })
-
-  $effect(() => {
-    const v = viewer
-    if (!v) return
-    const { width, height } = containerSize
-    if (width < 1 || height < 1) return
-    v.setSize(width, height)
   })
 
   $effect(() => {
@@ -457,20 +455,12 @@
     onpointercancel={handlePointerCancel}
   >
     <div style="position: absolute; inset: 0; z-index: 0; pointer-events: none;">
-      <div style="width: 100%; height: 100%; position: relative; overflow: hidden;">
-        <img
-          src="/skinstab/background.webp"
-          alt=""
-          aria-hidden={true}
-          style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0;"
-        />
+      <div style="width: 100%; height: 100%; position: relative; overflow: hidden; background-image: url(/skinstab/background.webp); background-size: cover; background-position: center; background-repeat: no-repeat;">
         <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.35); z-index: 1;"></div>
-        {#if loading}
-          <div style="position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            <Loader2 size={32} style="animation: spin 1s linear infinite; color: #3b82f6; margin-bottom: 12px;" />
-            <p style="font-size: 14px; color: var(--text-muted); margin: 0;">Loading skin…</p>
-          </div>
-        {/if}
+        <div style="position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; opacity: {loading ? 1 : 0}; transition: opacity 0.15s;">
+          <Loader2 size={32} style="animation: spin 1s linear infinite; color: #3b82f6; margin-bottom: 12px;" />
+          <p style="font-size: 14px; color: var(--text-muted); margin: 0;">Loading skin…</p>
+        </div>
         <canvas
           bind:this={canvasEl}
           style="display: block; position: relative; z-index: 2; opacity: {loading ? 0 : 1}; transition: opacity 0.2s; width: 100%; height: 100%;"
