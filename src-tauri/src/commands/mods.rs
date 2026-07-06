@@ -1,6 +1,6 @@
 use crate::commands::validation::{sanitize_instance_name, sanitize_mod_filename, sanitize_filename, sanitize_resourcepack_filename, sanitize_shaderpack_filename, validate_download_url};
 use crate::utils::{get_instance_dir, open_folder};
-use crate::utils::curseforge::{CurseforgeClient, CurseforgeGetModFilesResult, CurseforgeSearchResult};
+use crate::utils::curseforge::{CurseforgeClient, CurseforgeGetModFilesResult, CurseforgeSearchResult, CurseforgeModDetail};
 use crate::utils::modrinth::{ModrinthClient, ModrinthProjectDetails, ModrinthSearchResult, ModrinthVersion};
 use tauri::Manager;
 use serde::{Deserialize, Serialize};
@@ -696,4 +696,14 @@ pub async fn download_curseforge_file(
         .download_file(&download_url, &destination)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_curseforge_mod_details(
+    app_handle: tauri::AppHandle,
+    mod_id: u32,
+) -> Result<CurseforgeModDetail, String> {
+    let api_key = curseforge_api_key(&app_handle)?;
+    let client = CurseforgeClient::new(api_key).map_err(|e| e.to_string())?;
+    client.get_mod(mod_id).await
 }

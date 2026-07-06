@@ -291,6 +291,7 @@ pub fn run() {
             is_secrets_configured,
             search_curseforge_mods,
             get_curseforge_mod_files,
+            get_curseforge_mod_details,
             download_curseforge_file,
             download_curseforge_file_temp,
             get_installed_resourcepacks_with_metadata,

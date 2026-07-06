@@ -36,48 +36,12 @@ pub struct ModrinthProject {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModrinthProjectDetails {
-    pub slug: String,
-    pub title: String,
-    pub description: String,
-    pub categories: Vec<String>,
-    pub client_side: String,
-    pub server_side: String,
     pub body: String,
-    pub status: String,
-    pub project_type: String,
+    pub description: String,
     pub downloads: u64,
     pub icon_url: Option<String>,
-    pub color: Option<u32>,
     pub id: String,
-    pub team: String,
-    pub published: String,
-    pub updated: String,
-    pub followers: u32,
-    pub license: ProjectLicense,
-    pub versions: Vec<String>,
-    pub game_versions: Vec<String>,
-    pub loaders: Vec<String>,
-    pub gallery: Option<Vec<GalleryImage>>,
-    pub issues_url: Option<String>,
-    pub source_url: Option<String>,
-    pub wiki_url: Option<String>,
-    pub discord_url: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ProjectLicense {
-    pub id: String,
-    pub name: String,
-    pub url: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct GalleryImage {
-    pub url: String,
-    pub featured: bool,
-    pub title: Option<String>,
-    pub description: Option<String>,
-    pub created: String,
+    pub title: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -222,14 +186,21 @@ impl ModrinthClient {
     ) -> Result<ModrinthProjectDetails, Box<dyn std::error::Error>> {
         let url = format!("{}/project/{}", MODRINTH_API_BASE, id_or_slug);
 
-        let response = self.http_client.get(&url).send().await?;
+        let response = self.http_client.get(&url).send().await
+            .map_err(|e| format!("Modrinth request failed: {}", e))?;
 
         if !response.status().is_success() {
-            let error_text = response.text().await?;
-            return Err(format!("Modrinth API error: {}", error_text).into());
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(format!("Modrinth API error ({}): {}", status, body).into());
         }
 
-        let project: ModrinthProjectDetails = response.json().await?;
+        let body = response.text().await
+            .map_err(|e| format!("Failed to read Modrinth response body: {}", e))?;
+
+        let project: ModrinthProjectDetails = serde_json::from_str(&body)
+            .map_err(|e| format!("Failed to parse Modrinth response: {} | Body preview: {}",
+                e, &body[..body.len().min(200)]))?;
         Ok(project)
     }
 

@@ -73,6 +73,18 @@ pub struct CurseforgeCategory {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CurseforgeModDetail {
+    pub id: u32,
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    pub logo: Option<CurseforgeModAsset>,
+    #[serde(default)]
+    pub authors: Vec<CurseforgeModAuthor>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CurseforgeGetSingleFileResult {
     pub data: CurseforgeFile,
 }
@@ -260,6 +272,91 @@ impl CurseforgeClient {
         let bytes = response.bytes().await?;
         std::fs::write(destination, bytes)?;
         Ok(())
+    }
+
+    async fn get_mod_description(
+        &self,
+        mod_id: u32,
+    ) -> Result<String, String> {
+        let url = format!("{}/mods/{}/description", CURSEFORGE_API_BASE, mod_id);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .header("x-api-key", &self.api_key)
+            .send()
+            .await
+            .map_err(|e| format!("CurseForge description request failed: {}", e))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(format!("CurseForge description API error ({}): {}", status, body));
+        }
+
+        let body = response.text().await.map_err(|e| format!("Failed to read description response body: {}", e))?;
+
+        #[derive(Deserialize)]
+        struct DescriptionResponse {
+            data: serde_json::Value,
+        }
+
+        let result: DescriptionResponse = serde_json::from_str(&body)
+            .map_err(|e| format!("Failed to parse CurseForge description response: {} | Body preview: {}",
+                e, &body[..body.len().min(200)]))?;
+
+        let desc = match &result.data {
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Object(obj) => {
+                obj.get("description")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string()
+            }
+            _ => String::new(),
+        };
+        Ok(desc)
+    }
+
+    pub async fn get_mod(
+        &self,
+        mod_id: u32,
+    ) -> Result<CurseforgeModDetail, String> {
+        let url = format!("{}/mods/{}", CURSEFORGE_API_BASE, mod_id);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .header("x-api-key", &self.api_key)
+            .send()
+            .await
+            .map_err(|e| format!("CurseForge request failed: {}", e))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(format!("CurseForge API error ({}): {}", status, body));
+        }
+
+        let body = response.text().await.map_err(|e| format!("Failed to read response body: {}", e))?;
+
+        #[derive(Deserialize)]
+        struct ModDetailResponse {
+            data: CurseforgeModDetail,
+        }
+
+        let mut result: CurseforgeModDetail = serde_json::from_str::<ModDetailResponse>(&body)
+            .map_err(|e| format!("Failed to parse CurseForge response: {} | Body preview: {}",
+                e, &body[..body.len().min(200)]))?
+            .data;
+
+        if result.description.is_empty() {
+            if let Ok(desc) = self.get_mod_description(mod_id).await {
+                result.description = desc;
+            }
+        }
+
+        Ok(result)
     }
 }
 
