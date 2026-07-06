@@ -1,5 +1,6 @@
 <script lang="ts">
   import { listen } from "@tauri-apps/api/event"
+  import { invoke } from "@tauri-apps/api/core"
   import { getCurrentWindow } from "@tauri-apps/api/window"
   import { Minus, Square, X, Terminal, Trash2, Upload, ExternalLink, Loader2, X as XIcon } from "lucide-svelte"
   import type { ConsoleLog } from "../../types"
@@ -107,7 +108,7 @@
       const data = await response.json()
       if (data.success) {
         await navigator.clipboard.writeText(data.url)
-        window.open(data.url, '_blank')
+        invoke('open_url', { url: data.url }).catch(() => {})
         uploadState = { loading: false, url: data.url, error: null }
         setTimeout(() => uploadState = { loading: false, url: null, error: null }, 3000)
       } else {

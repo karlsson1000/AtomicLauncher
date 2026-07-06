@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Terminal, Trash2, Upload, ExternalLink, Loader2, X, PictureInPicture } from "lucide-svelte"
+  import { invoke } from "@tauri-apps/api/core"
   import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
   import { store, handleClearConsole } from "../../lib/launcherStore.svelte"
   import type { ConsoleLog } from "../../types"
@@ -132,7 +133,7 @@
 
       if (data.success) {
         await navigator.clipboard.writeText(data.url)
-        window.open(data.url, '_blank')
+        invoke('open_url', { url: data.url }).catch(() => {})
         uploadState = { loading: false, url: data.url, error: null }
         setTimeout(() => { uploadState = { loading: false, url: null, error: null } }, 3000)
       } else {
