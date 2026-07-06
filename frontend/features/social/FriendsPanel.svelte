@@ -16,7 +16,7 @@
     if (isOpen && isAuthenticated) {
       loadFriends()
       loadRequests()
-      const interval = setInterval(loadFriends, 30000)
+      const interval = setInterval(pollFriends, 30000)
       return () => clearInterval(interval)
     }
     void activeAccountUuid
@@ -31,6 +31,15 @@
       console.error("Failed to load friends:", error)
     } finally {
       isLoading = false
+    }
+  }
+
+  const pollFriends = async () => {
+    try {
+      const result = await invoke<Friend[]>("get_friends")
+      friends = result
+    } catch (error) {
+      console.error("Failed to poll friends:", error)
     }
   }
 
@@ -207,6 +216,8 @@
                     src="https://avatar.mcindex.net/avatar/{friend.username}/32"
                     alt={friend.username}
                     class="w-8 h-8 rounded object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
                   <div class="absolute -bottom-0.5 -right-0.5">
                     {#if friend.status === "online"}
