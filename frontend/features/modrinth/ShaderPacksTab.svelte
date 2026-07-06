@@ -13,6 +13,7 @@
     hideToolbar = false,
     searchQuery = undefined as string | undefined,
     onSearchQueryChange = undefined as ((query: string) => void) | undefined,
+    onViewProjectDetail = undefined as ((source: "modrinth" | "curseforge", projectId: string, slug: string, projectType: string, author?: string) => void) | undefined,
   }: {
     selectedInstance: Instance | null
     sourceSelector?: Snippet
@@ -20,6 +21,7 @@
     hideToolbar?: boolean
     searchQuery?: string
     onSearchQueryChange?: (query: string) => void
+    onViewProjectDetail?: (source: "modrinth" | "curseforge", projectId: string, slug: string, projectType: string, author?: string) => void
   } = $props()
 
   const ITEMS_PER_PAGE = 20
@@ -183,15 +185,15 @@
     </div>
   {/if}
 
-  <div class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-2">
-    <div class="lg:col-span-2 space-y-3 overflow-y-auto pr-2">
+  <div class="flex-1 min-h-0 {hideToolbar ? '' : 'grid grid-cols-1 lg:grid-cols-3 gap-2'}">
+    <div class="{hideToolbar ? '' : 'lg:col-span-2'} space-y-3 overflow-y-auto pr-2">
       {#each hits as shader (shader.project_id)}
         <div
           class="rounded-md overflow-hidden cursor-pointer transition-all {selectedShader?.project_id === shader.project_id ? 'bg-[var(--bg-elevated)]' : 'bg-[var(--bg-tertiary)]'}"
           role="button"
           tabindex="0"
           onkeydown={(e) => { if (e.key === 'Enter') handleShaderSelect(shader); }}
-          onclick={() => handleShaderSelect(shader)}
+          onclick={() => { if (onViewProjectDetail) onViewProjectDetail("modrinth", shader.project_id, shader.slug, "shaderpack", shader.author); handleShaderSelect(shader); }}
         >
           <div class="flex min-h-0 relative z-0">
             {#if shader.icon_url}
@@ -232,7 +234,7 @@
       </div>
     </div>
 
-    {#if selectedShader}
+    {#if !hideToolbar && selectedShader}
       <div class="bg-[var(--bg-tertiary)] rounded-md p-3 sticky top-0 self-start">
         <div class="flex gap-3 mb-4">
           {#if selectedShader.icon_url}

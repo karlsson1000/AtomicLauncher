@@ -16,6 +16,7 @@
     hideToolbar = false,
     searchQuery = undefined as string | undefined,
     onSearchQueryChange = undefined as ((query: string) => void) | undefined,
+    onViewProjectDetail = undefined as ((source: "modrinth" | "curseforge", projectId: string, slug: string, projectType: string, author?: string) => void) | undefined,
   }: {
     selectedInstance: Instance | null
     instances: Instance[]
@@ -25,6 +26,7 @@
     hideToolbar?: boolean
     searchQuery?: string
     onSearchQueryChange?: (query: string) => void
+    onViewProjectDetail?: (source: "modrinth" | "curseforge", projectId: string, slug: string, projectType: string, author?: string) => void
   } = $props()
 
   let internalSearchQuery = $state("")
@@ -197,15 +199,15 @@
     </div>
   {/if}
 
-  <div class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-2">
-    <div class="lg:col-span-2 space-y-3 overflow-y-auto pr-2">
+  <div class="flex-1 min-h-0 {hideToolbar ? '' : 'grid grid-cols-1 lg:grid-cols-3 gap-2'}">
+    <div class="{hideToolbar ? '' : 'lg:col-span-2'} space-y-3 overflow-y-auto pr-2">
       {#each hits as mod (mod.project_id)}
         <div
           class="rounded-md overflow-hidden cursor-pointer transition-all {selectedMod?.project_id === mod.project_id ? 'bg-[var(--bg-elevated)]' : 'bg-[var(--bg-tertiary)]'}"
           role="button"
           tabindex="0"
           onkeydown={(e) => { if (e.key === 'Enter') handleModSelect(mod); }}
-          onclick={() => handleModSelect(mod)}
+          onclick={() => { if (onViewProjectDetail) onViewProjectDetail("modrinth", mod.project_id, mod.slug, "mod", mod.author); handleModSelect(mod); }}
         >
           <div class="flex min-h-0 relative z-0">
             {#if mod.icon_url}
@@ -246,7 +248,7 @@
       </div>
     </div>
 
-    {#if selectedMod}
+    {#if !hideToolbar && selectedMod}
       <div class="bg-[var(--bg-tertiary)] rounded-md p-3 sticky top-0 self-start">
         <div class="flex gap-3 mb-4">
           {#if selectedMod.icon_url}

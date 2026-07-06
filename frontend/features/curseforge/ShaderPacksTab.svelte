@@ -13,6 +13,7 @@
     modsSelector,
     searchQuery,
     onSearchQueryChange,
+    onViewProjectDetail,
   }: {
     selectedInstance: Instance | null
     hideToolbar?: boolean
@@ -20,6 +21,7 @@
     modsSelector?: Snippet
     searchQuery?: string
     onSearchQueryChange?: (query: string) => void
+    onViewProjectDetail?: (source: "modrinth" | "curseforge", projectId: string, slug: string, projectType: string, author?: string) => void
   } = $props()
 
   const CLASS_ID = 6552
@@ -223,15 +225,15 @@
       </div>
     {/if}
 
-    <div class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-2">
-      <div class="lg:col-span-2 space-y-3 overflow-y-auto pr-2">
+    <div class="flex-1 min-h-0 {hideToolbar ? '' : 'grid grid-cols-1 lg:grid-cols-3 gap-2'}">
+      <div class="{hideToolbar ? '' : 'lg:col-span-2'} space-y-3 overflow-y-auto pr-2">
         {#each hits as item (item.id)}
           <div
             class="rounded-md overflow-hidden cursor-pointer transition-all {selectedItem?.id === item.id ? 'bg-[var(--bg-elevated)]' : 'bg-[var(--bg-tertiary)]'}"
           role="button"
           tabindex="0"
           onkeydown={(e) => { if (e.key === 'Enter') handleItemSelect(item); }}
-          onclick={() => handleItemSelect(item)}
+          onclick={() => { if (onViewProjectDetail) onViewProjectDetail("curseforge", String(item.id), item.slug, "shaderpack", item.authors[0]?.name); handleItemSelect(item); }}
         >
           <div class="flex min-h-0 relative z-0">
             {#if item.logo?.thumbnailUrl}
@@ -274,7 +276,7 @@
         </div>
       </div>
 
-      {#if selectedItem}
+      {#if !hideToolbar && selectedItem}
         <div class="bg-[var(--bg-tertiary)] rounded-md p-3 sticky top-0 self-start">
           <div class="flex gap-3 mb-4">
             {#if selectedItem.logo?.thumbnailUrl}
