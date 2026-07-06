@@ -383,6 +383,14 @@ export interface CurseforgeCategory {
   isClass: boolean
 }
 
+export interface CurseforgeModDetail {
+  id: number
+  name: string
+  description: string
+  logo: CurseforgeModAsset | null
+  authors: CurseforgeModAuthor[]
+}
+
 export interface CurseforgeGetModFilesResult {
   data: CurseforgeFile[]
 }
@@ -402,6 +410,8 @@ export interface CurseforgeFileDependency {
   modId: number
   relationType: number
 }
+
+
 
 export interface CurseforgeFileHash {
   value: string
