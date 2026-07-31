@@ -250,7 +250,8 @@
   {:else}
     <div class="h-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-11 gap-2">
       <!-- Left: Header + Description -->
-      <div class="relative {showInstallSection() ? 'lg:col-span-8' : 'lg:col-span-11'} overflow-y-auto pr-2 space-y-4">
+      <div class="{showInstallSection() ? 'lg:col-span-8' : 'lg:col-span-11'} overflow-y-auto pr-2">
+      <div class="relative space-y-4 bg-[var(--bg-tertiary)] rounded-md p-4">
         <button
           onclick={onBack}
           class="absolute top-2 right-2 z-20 flex items-center justify-center w-9 h-9 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
@@ -287,6 +288,7 @@
           </div>
         {/if}
       </div>
+      </div>
 
       <!-- Right: Versions sidebar -->
       {#if showInstallSection()}
@@ -306,7 +308,7 @@
           {:else if source === "curseforge" && curseforgeFiles.length === 0}
             <p class="text-sm text-[var(--text-muted)]">No files available</p>
           {:else}
-            <div class="space-y-2 pr-1">
+            <div class="space-y-2 pr-2">
               {#if source === "modrinth"}
                 {#each versions as version (version.id)}
                   {@const installed = isInstalled(version.files.find(f => f.primary)?.filename || version.files[0]?.filename || "")}
