@@ -327,11 +327,16 @@
   }
 
   async function handleToggleMod(mod: InstalledMod) {
-    installedMods = installedMods.map(m => m.filename === mod.filename ? { ...m, disabled: !m.disabled } : m)
+    const disabled = !mod.disabled
+    const filename = disabled
+      ? (mod.filename.endsWith(".disabled") ? mod.filename : `${mod.filename}.disabled`)
+      : (mod.filename.endsWith(".disabled") ? mod.filename.slice(0, -".disabled".length) : mod.filename)
+    const updated = { ...mod, filename, disabled }
+    installedMods = installedMods.map(m => m.filename === mod.filename ? updated : m)
     try {
-      await invoke("toggle_mod", { instanceName: instance.name, filename: mod.filename, disable: !mod.disabled })
+      await invoke("toggle_mod", { instanceName: instance.name, filename: mod.filename, disable: disabled })
     } catch (error) {
-      installedMods = installedMods.map(m => m.filename === mod.filename ? { ...m, disabled: !m.disabled } : m)
+      installedMods = installedMods.map(m => m.filename === filename ? mod : m)
       console.error("Failed to toggle mod:", error)
       alertModal = { isOpen: true, title: "Error", message: `Failed to ${mod.disabled ? "enable" : "disable"} mod: ${String(error)}`, type: "danger" }
     }
