@@ -227,6 +227,7 @@ async function handleLaunch(instance: Instance) {
   if (!store.activeAccount) return
   store.launchingInstanceName = instance.name
   store.consoleLogs = []
+  store.consoleLogs = [{ instance: instance.name, message: `Launching ${instance.name}...`, type: "stdout" }]
   if (store.settings?.auto_navigate_to_console !== false) {
     store.activeTab = "console"
     store.showInstanceDetails = false
@@ -236,11 +237,13 @@ async function handleLaunch(instance: Instance) {
       instanceName: instance.name,
       appHandle: appWindow,
     })
+    store.consoleLogs = [...store.consoleLogs, { instance: instance.name, message: "Minecraft started", type: "stdout" }]
     await loadInstances()
     store.runningInstances = new Set(store.runningInstances).add(instance.name)
     store.launchingInstanceName = null
   } catch (error) {
     console.error("Launch error:", error)
+    store.consoleLogs = [...store.consoleLogs, { instance: instance.name, message: `ERROR: ${String(error)}`, type: "stderr" }]
     store.launchingInstanceName = null
   }
 }
