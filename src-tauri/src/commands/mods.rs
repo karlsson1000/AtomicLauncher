@@ -105,7 +105,12 @@ pub async fn get_installed_mods(instance_name: String) -> Result<Vec<ModFile>, S
 #[tauri::command]
 pub async fn delete_mod(instance_name: String, filename: String) -> Result<(), String> {
     let safe_name = sanitize_instance_name(&instance_name)?;
-    let safe_filename = sanitize_mod_filename(&filename)?;
+    let safe_filename = if filename.ends_with(".disabled") {
+        let base = sanitize_mod_filename(filename.trim_end_matches(".disabled"))?;
+        format!("{}.disabled", base)
+    } else {
+        sanitize_mod_filename(&filename)?
+    };
     
     let instance_dir = get_instance_dir(&safe_name);
     let mods_dir = instance_dir.join("mods");
