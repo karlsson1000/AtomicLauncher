@@ -91,7 +91,7 @@
   let forgeDropdownRef = $state<HTMLDivElement | undefined>(undefined)
 
   let useCustomRam = $state(false)
-  let instanceMemoryMb = $state(2048)
+  let instanceMemoryMb = $state(4096)
   let systemInfo = $state<SystemInfo | null>(null)
   let ramSaveTimeout: ReturnType<typeof setTimeout> | undefined
 
@@ -155,12 +155,12 @@
         instanceMemoryMb = settings.memory_mb
       } else {
         useCustomRam = false
-        instanceMemoryMb = 2048
+        instanceMemoryMb = 4096
       }
     } catch (error) {
       console.error("Failed to load instance RAM settings:", error)
       useCustomRam = false
-      instanceMemoryMb = 2048
+      instanceMemoryMb = 4096
     }
   }
 
@@ -180,7 +180,6 @@
         const newSettings: LauncherSettings = {
           memory_mb: memoryMb,
           java_path: currentSettings?.java_path ?? null,
-          language: currentSettings?.language,
           auto_navigate_to_console: currentSettings?.auto_navigate_to_console ?? true,
         }
         await invoke("save_instance_settings", { instanceName: instance.name, settings: newSettings })

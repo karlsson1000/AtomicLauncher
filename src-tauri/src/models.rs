@@ -83,8 +83,6 @@ pub struct LauncherSettings {
     pub java_path: Option<String>,
     #[serde(default = "default_memory")]
     pub memory_mb: u32,
-    #[serde(default)]
-    pub language: Option<String>,
     #[serde(default = "default_auto_navigate_to_console")]
     pub auto_navigate_to_console: bool,
     #[serde(default = "default_theme")]
@@ -93,7 +91,7 @@ pub struct LauncherSettings {
     pub default_tab: String,
 }
 
-fn default_memory() -> u32 { 2048 }
+fn default_memory() -> u32 { 4096 }
 fn default_auto_navigate_to_console() -> bool { true }
 fn default_theme() -> String { "octane".to_string() }
 fn default_tab() -> String { "home".to_string() }
@@ -102,8 +100,7 @@ impl Default for LauncherSettings {
     fn default() -> Self {
         Self {
             java_path: None,
-            memory_mb: 2048,
-            language: None,
+            memory_mb: 4096,
             auto_navigate_to_console: true,
             theme: default_theme(),
             default_tab: default_tab(),

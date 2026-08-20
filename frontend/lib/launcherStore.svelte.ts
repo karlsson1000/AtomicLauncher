@@ -356,9 +356,6 @@ function handleClearConsole(instanceName: string) {
   store.consoleLogs = store.consoleLogs.filter(log => log.instance !== instanceName)
 }
 function handleNavigateToInstances() { store.activeTab = "instances" }
-function handleLaunchSelected() {
-  if (store.selectedInstance) handleLaunch(store.selectedInstance)
-}
 
 async function handleWorldLaunch(worldName: string) {
   if (!store.selectedInstance || !store.activeAccount) return
@@ -515,7 +512,6 @@ export {
   handleCreateNew,
   handleClearConsole,
   handleNavigateToInstances,
-  handleLaunchSelected,
   handleWorldLaunch,
   loadInstances,
   handleInstanceRenamed,
