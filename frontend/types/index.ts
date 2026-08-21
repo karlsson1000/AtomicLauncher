@@ -104,7 +104,7 @@ export interface ConsoleLog {
 
 export interface ModrinthProjectDetails {
   id: string
-  slug: string
+  slug?: string
   project_type: string
   team: string
   title: string

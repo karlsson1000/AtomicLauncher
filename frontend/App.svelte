@@ -12,7 +12,7 @@
   import OnboardingModal from "./features/onboarding/OnboardingModal.svelte"
   import HomeTab from "./features/home/HomeTab.svelte"
   import InstancesTab from "./features/instances/InstancesTab.svelte"
-  import BrowseTab from "./features/browse/BrowseTab.svelte"
+  import AddonsTab from "./features/addons/AddonsTab.svelte"
   import ConsoleTab from "./features/console/ConsoleTab.svelte"
   import ServersTab from "./features/servers/ServersTab.svelte"
   import SkinsTab from "./features/skins/SkinsTab.svelte"
@@ -84,8 +84,8 @@
           <HomeTab />
         {:else if store.activeTab === "instances"}
           <InstancesTab />
-        {:else if store.activeTab === "browse"}
-          <BrowseTab />
+        {:else if store.activeTab === "addons"}
+          <AddonsTab />
         {:else if store.activeTab === "servers"}
           <ServersTab />
         {:else if store.activeTab === "skins"}

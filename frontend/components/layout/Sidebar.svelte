@@ -12,7 +12,7 @@
   const tabs = [
     { id: "home" as const, icon: Home, label: "Home" },
     { id: "instances" as const, icon: Package, label: "Instances" },
-    { id: "browse" as const, icon: Puzzle, label: "Addons" },
+    { id: "addons" as const, icon: Puzzle, label: "Addons" },
     { id: "servers" as const, icon: Server, label: "Servers" },
     { id: "skins" as const, icon: HatGlasses, label: "Skins" },
     { id: "screenshots" as const, icon: Camera, label: "Screenshots" },

@@ -15,7 +15,10 @@
     author = "",
     projectType,
     selectedInstance,
+    instances = [],
     onBack,
+    onShowCreationToast = undefined as ((instanceName: string) => void) | undefined,
+    onRefreshInstances = undefined as (() => void) | undefined,
   }: {
     source: "modrinth" | "curseforge"
     projectId: string
@@ -23,8 +26,13 @@
     author?: string
     projectType: string
     selectedInstance: Instance | null
+    instances?: Instance[]
     onBack: () => void
+    onShowCreationToast?: (instanceName: string) => void
+    onRefreshInstances?: () => void
   } = $props()
+
+  const isModpack = $derived(projectType === "modpack")
 
   const marked = new Marked({
     breaks: true,
@@ -42,6 +50,11 @@
 
   let installedFiles = $state<Set<string>>(new Set())
   let downloadingMap = $state<Set<string>>(new Set())
+  let completedIds = $state<Set<string>>(new Set())
+
+  function uniqueInstanceName(name: string): string {
+    return instances.some(i => i.name === name) ? `${name}-${Date.now()}` : name
+  }
 
   let renderedBody = $state("")
 
@@ -168,20 +181,33 @@
   }
 
   async function handleInstallVersion(version: ModrinthVersion) {
-    if (!selectedInstance) return
+    if (!isModpack && !selectedInstance) return
     const primaryFile = version.files.find(f => f.primary) || version.files[0]
-    if (!primaryFile) return
+    if (!primaryFile && !isModpack) return
     downloadingMap = new Set(downloadingMap).add(version.id)
     try {
       if (source === "modrinth") {
-        const targetCommand = projectType === "resourcepack" ? "download_resourcepack" : projectType === "shaderpack" ? "download_shaderpack" : "download_mod"
-        await invoke<string>(targetCommand, {
-          instanceName: selectedInstance.name,
-          downloadUrl: primaryFile.url,
-          filename: primaryFile.filename,
-        })
+        if (isModpack) {
+          const instanceName = uniqueInstanceName(details?.title || version.name)
+          onShowCreationToast?.(instanceName)
+          await invoke("install_modpack", {
+            modpackSlug: details!.id,
+            instanceName,
+            versionId: version.id,
+            preferredGameVersion: null,
+          })
+          if (onRefreshInstances) setTimeout(() => onRefreshInstances!(), 500)
+          completedIds = new Set(completedIds).add(version.id)
+        } else {
+          const targetCommand = projectType === "resourcepack" ? "download_resourcepack" : projectType === "shaderpack" ? "download_shaderpack" : "download_mod"
+          await invoke<string>(targetCommand, {
+            instanceName: selectedInstance!.name,
+            downloadUrl: primaryFile!.url,
+            filename: primaryFile!.filename,
+          })
+          installedFiles = new Set(installedFiles).add(primaryFile!.filename)
+        }
       }
-      installedFiles = new Set(installedFiles).add(primaryFile.filename)
     } catch (e) {
       console.error("Download error:", e)
     } finally {
@@ -192,17 +218,34 @@
   }
 
   async function handleInstallCurseforgeFile(file: CurseforgeFile) {
-    if (!selectedInstance || !file.downloadUrl) return
+    if (!file.downloadUrl) return
+    if (!isModpack && !selectedInstance) return
     downloadingMap = new Set(downloadingMap).add(file.id.toString())
     try {
-      const targetFolder = projectType === "resourcepack" ? "resourcepacks" : projectType === "shaderpack" ? "shaderpacks" : "mods"
-      await invoke<string>("download_curseforge_file", {
-        instanceName: selectedInstance.name,
-        downloadUrl: file.downloadUrl,
-        filename: file.fileName,
-        targetFolder,
-      })
-      installedFiles = new Set(installedFiles).add(file.fileName)
+      if (isModpack) {
+        const filePath = await invoke<string>("download_curseforge_file_temp", {
+          downloadUrl: file.downloadUrl,
+          filename: file.fileName,
+        })
+        const instanceName = uniqueInstanceName(curseforgeDetails?.name || file.fileName)
+        onShowCreationToast?.(instanceName)
+        await invoke("install_modpack_from_file", {
+          filePath,
+          instanceName,
+          preferredGameVersion: null,
+        })
+        if (onRefreshInstances) setTimeout(() => onRefreshInstances!(), 500)
+        completedIds = new Set(completedIds).add(file.id.toString())
+      } else {
+        const targetFolder = projectType === "resourcepack" ? "resourcepacks" : projectType === "shaderpack" ? "shaderpacks" : "mods"
+        await invoke<string>("download_curseforge_file", {
+          instanceName: selectedInstance!.name,
+          downloadUrl: file.downloadUrl,
+          filename: file.fileName,
+          targetFolder,
+        })
+        installedFiles = new Set(installedFiles).add(file.fileName)
+      }
     } catch (e) {
       console.error("Download error:", e)
     } finally {
@@ -297,7 +340,7 @@
             <h2 class="text-lg font-semibold text-[var(--text-primary)] px-3">Versions</h2>
           </div>
 
-          {#if !selectedInstance}
+          {#if !isModpack && !selectedInstance}
             <p class="text-sm text-[var(--text-muted)]">Select an instance to install</p>
           {:else if isLoadingVersions}
             <div class="flex items-center justify-center py-8">
@@ -313,6 +356,7 @@
                 {#each versions as version (version.id)}
                   {@const installed = isInstalled(version.files.find(f => f.primary)?.filename || version.files[0]?.filename || "")}
                   {@const downloading = downloadingMap.has(version.id)}
+                  {@const done = completedIds.has(version.id)}
                   <div class="bg-[var(--bg-tertiary)] rounded-md p-3 flex items-center justify-between gap-2">
                     <div class="flex-1 min-w-0">
                       <div class="text-sm font-medium text-[var(--text-primary)] truncate">{version.name}</div>
@@ -326,12 +370,12 @@
                     </div>
                     <button
                       onclick={() => handleInstallVersion(version)}
-                      disabled={!selectedInstance || downloading || installed}
+                      disabled={downloading || installed || done || (!isModpack && !selectedInstance)}
                       class="px-3 py-2 bg-[#16a34a] hover:bg-[#22c55e] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded text-xs font-medium whitespace-nowrap transition-all cursor-pointer flex items-center gap-1 flex-shrink-0"
                     >
                       {#if downloading}
                         <Loader2 size={14} class="animate-spin" />
-                      {:else if installed}
+                      {:else if installed || done}
                         Installed
                       {:else}
                         <Download size={14} />Install
@@ -343,6 +387,7 @@
                 {#each curseforgeFiles as file (file.id)}
                   {@const installed = isInstalled(file.fileName)}
                   {@const downloading = downloadingMap.has(file.id.toString())}
+                  {@const done = completedIds.has(file.id.toString())}
                   <div class="bg-[var(--bg-tertiary)] rounded-md p-3 flex items-center justify-between gap-2">
                     <div class="flex-1 min-w-0">
                       <div class="text-sm font-medium text-[var(--text-primary)] truncate">{file.fileName}</div>
@@ -353,7 +398,7 @@
                     </div>
                     <button
                       onclick={() => handleInstallCurseforgeFile(file)}
-                      disabled={!selectedInstance || downloading || installed || !file.downloadUrl}
+                      disabled={downloading || installed || done || !file.downloadUrl || (!isModpack && !selectedInstance)}
                       class="px-3 py-2 bg-[#16a34a] hover:bg-[#22c55e] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded text-xs font-medium whitespace-nowrap transition-all cursor-pointer flex items-center gap-1 flex-shrink-0"
                     >
                       {#if downloading}

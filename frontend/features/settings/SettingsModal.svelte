@@ -449,7 +449,7 @@
                 </button>
                 {#if isTabDropdownOpen}
                   <div class="absolute right-0 z-[60] w-36 bg-[var(--bg-elevated)] rounded shadow-lg overflow-hidden mt-1">
-                    {#each ["home", "instances", "browse", "servers", "skins", "screenshots"] as tab}
+                    {#each ["home", "instances", "addons", "servers", "skins", "screenshots"] as tab}
                       <button
                         onclick={() => { handleSettingChange({ ...store.settings!, default_tab: tab } as LauncherSettings); isTabDropdownOpen = false }}
                         class="w-full px-3 py-2 text-sm text-left hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-between cursor-pointer capitalize"

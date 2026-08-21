@@ -4,8 +4,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window"
 import type { Instance, LauncherSettings, ConsoleLog, AccountInfo, UpdateInfo } from "../types"
 import { storeGet, storeSet } from "./store"
 
-type ActiveTab = "home" | "instances" | "browse" | "console" | "servers" | "skins" | "screenshots"
-type BrowseSubTab = "mods" | "modpacks" | "resourcepacks" | "shaderpacks"
+type ActiveTab = "home" | "instances" | "addons" | "console" | "servers" | "skins" | "screenshots"
+type AddonsSubTab = "mods" | "modpacks" | "resourcepacks" | "shaderpacks"
 type ModalType = "warning" | "danger" | "success" | "info"
 
 interface ConfirmModalState {
@@ -67,7 +67,7 @@ export const store = $state({
   isInstallingUpdate: false,
   showAccountDropdown: false,
   showFriendsPanel: false,
-  browseSubTab: "mods" as BrowseSubTab,
+  addonsSubTab: "mods" as AddonsSubTab,
   showOnboarding: false,
   exportModalInstance: null as Instance | null,
 })
@@ -392,7 +392,7 @@ function setShowFriendsPanel(v: boolean) {
   store.showFriendsPanel = v
   storeSet("friends_panel_open", v)
 }
-function setBrowseSubTab(v: BrowseSubTab) { store.browseSubTab = v }
+function setAddonsSubTab(v: AddonsSubTab) { store.addonsSubTab = v }
 function setShowOnboarding(v: boolean) {
   store.showOnboarding = v
   if (!v) storeSet("onboarding_complete", true)
@@ -449,9 +449,10 @@ async function loadAllInitialData() {
     storeGet<boolean>("onboarding_complete").then(v => { if (!v) store.showOnboarding = true }),
   ])
   if (!appliedDefaultTab && store.settings?.default_tab) {
-    const validTabs = ["home", "instances", "browse", "console", "servers", "skins", "screenshots"]
-    if (validTabs.includes(store.settings.default_tab)) {
-      store.activeTab = store.settings.default_tab as ActiveTab
+    const defaultTab = store.settings.default_tab === "browse" ? "addons" : store.settings.default_tab
+    const validTabs = ["home", "instances", "addons", "console", "servers", "skins", "screenshots"]
+    if (validTabs.includes(defaultTab)) {
+      store.activeTab = defaultTab as ActiveTab
     }
     appliedDefaultTab = true
   }
@@ -508,7 +509,7 @@ export {
   setSidebarContextMenu,
   setShowAccountDropdown,
   setShowFriendsPanel,
-  setBrowseSubTab,
+  setAddonsSubTab,
   setShowOnboarding,
   setExportModal,
   generateUniqueName,

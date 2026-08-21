@@ -8,11 +8,11 @@
   } from "../../lib/launcherStore.svelte"
 
   const tabLabels: Record<string, string> = {
-    home: "Home", instances: "Instances", browse: "Addons",
+    home: "Home", instances: "Instances", addons: "Addons",
     servers: "Servers", skins: "Skins", screenshots: "Screenshots", console: "Console",
   }
 
-  const browseSubTabLabels: Record<string, string> = {
+  const addonsSubTabLabels: Record<string, string> = {
     mods: "Mods", modpacks: "Modpacks", resourcepacks: "Resource Packs", shaderpacks: "Shader Packs",
   }
 
@@ -58,8 +58,8 @@
   <span class="text-sm font-medium text-[var(--text-secondary)] ml-1 select-none" style={dragRegion}>
     {store.showInstanceDetails && store.selectedInstance
       ? `Instances / ${store.selectedInstance.name}`
-      : store.activeTab === "browse"
-      ? `Addons / ${browseSubTabLabels[store.browseSubTab]}`
+      : store.activeTab === "addons"
+      ? `Addons / ${addonsSubTabLabels[store.addonsSubTab]}`
       : tabLabels[store.activeTab]}
   </span>
 
