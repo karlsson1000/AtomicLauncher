@@ -61,6 +61,7 @@
   })
 
   $effect(() => {
+    searchQuery;
     if (searchTimeout) clearTimeout(searchTimeout)
     offset = 0
     hasMore = true
