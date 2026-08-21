@@ -299,6 +299,8 @@ input[type="range"]::-moz-range-thumb:hover {
 .markdown-body h4 { font-size: 1.125rem; font-weight: 600; margin: 0.875rem 0 0.5rem; color: var(--text-primary); }
 .markdown-body p { margin: 0 0 0.75rem; line-height: 1.7; color: var(--text-secondary); }
 .markdown-body ul, .markdown-body ol { margin: 0 0 0.75rem; padding-left: 1.5rem; color: var(--text-secondary); }
+.markdown-body ul { list-style-type: disc; }
+.markdown-body ol { list-style-type: decimal; }
 .markdown-body li { margin: 0.25rem 0; line-height: 1.6; }
 .markdown-body a { color: var(--accent-primary); text-decoration: none; }
 .markdown-body a:hover { text-decoration: underline; }
