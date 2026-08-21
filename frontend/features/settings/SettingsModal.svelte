@@ -1,9 +1,9 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core"
-  import { Loader2, Coffee, Cpu, ImagePlus, FolderOpen, X, Check, ChevronDown, Info, Terminal, Paintbrush, Play } from "lucide-svelte"
+  import { Loader2, Coffee, Cpu, ImagePlus, FolderOpen, X, Check, ChevronDown, Info, Terminal, Paintbrush, Play, Sparkles } from "lucide-svelte"
   import AlertModal from "../../components/ui/AlertModal.svelte"
   import TrashSection from "./TrashSection.svelte"
-  import { store, setSettings, loadBackground } from "../../lib/launcherStore.svelte"
+  import { store, setSettings, loadBackground, setShowOnboarding } from "../../lib/launcherStore.svelte"
   import { storeSet } from "../../lib/store"
   import type { LauncherSettings } from "../../types"
 
@@ -549,6 +549,25 @@
 
           <!-- Trash -->
           <TrashSection onAlert={(alert) => alertModal = alert} />
+
+          <!-- Onboarding -->
+          <div class="space-y-2">
+            <div class="flex items-center gap-2 text-[var(--text-primary)]">
+              <Sparkles size={16} class="text-[var(--accent-primary)]" />
+              <span class="font-medium text-sm">Onboarding</span>
+            </div>
+            <div class="bg-[var(--bg-elevated)] rounded p-3 flex items-center justify-between gap-3">
+              <span class="text-xs text-[var(--text-muted)] leading-relaxed">
+                Revisit the first-time setup, import instances from other launchers.
+              </span>
+              <button
+                onclick={() => { onClose(); setShowOnboarding(true) }}
+                class="flex-shrink-0 px-2.5 py-1.5 bg-[var(--bg-hover)] hover:bg-[var(--bg-hover)] rounded text-xs font-medium text-[var(--text-primary)] cursor-pointer transition-colors"
+              >
+                Show onboarding
+              </button>
+            </div>
+          </div>
 
           <!-- Version Information -->
           <div class="space-y-2">

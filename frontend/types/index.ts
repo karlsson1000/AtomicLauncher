@@ -416,3 +416,14 @@ export interface CurseforgeFileHash {
   value: string
   algo: number
 }
+
+export interface ImportableInstance {
+  source: "prism" | "modrinth" | "curseforge"
+  name: string
+  path: string
+  mc_version: string | null
+  loader: string | null
+  loader_version: string | null
+  size_bytes: number
+  icon_path: string | null
+}

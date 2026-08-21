@@ -68,6 +68,7 @@ export const store = $state({
   showAccountDropdown: false,
   showFriendsPanel: false,
   browseSubTab: "mods" as BrowseSubTab,
+  showOnboarding: false,
 })
 
 const appWindow = getCurrentWindow()
@@ -235,7 +236,6 @@ async function handleLaunch(instance: Instance) {
   try {
     await invoke<string>("launch_instance_with_active_account", {
       instanceName: instance.name,
-      appHandle: appWindow,
     })
     store.consoleLogs = [...store.consoleLogs, { instance: instance.name, message: "Minecraft started", type: "stdout" }]
     await loadInstances()
@@ -287,7 +287,6 @@ async function handleDuplicateInstance(instance: Instance) {
     await invoke("duplicate_instance", {
       instanceName: instance.name,
       newName,
-      appHandle: appWindow,
     })
     await loadInstances()
   } catch (error) {
@@ -393,6 +392,19 @@ function setShowFriendsPanel(v: boolean) {
   storeSet("friends_panel_open", v)
 }
 function setBrowseSubTab(v: BrowseSubTab) { store.browseSubTab = v }
+function setShowOnboarding(v: boolean) {
+  store.showOnboarding = v
+  if (!v) storeSet("onboarding_complete", true)
+}
+function generateUniqueName(base: string): string {
+  let candidate = base
+  let counter = 1
+  while (store.instances.some(i => i.name === candidate)) {
+    counter++
+    candidate = `${base} (${counter})`
+  }
+  return candidate
+}
 
 let heartbeatTimer: ReturnType<typeof setInterval> | undefined
 
@@ -432,6 +444,7 @@ async function loadAllInitialData() {
     loadAccounts(),
     loadBackground(),
     storeGet<boolean>("friends_panel_open").then(v => { if (v) store.showFriendsPanel = true }),
+    storeGet<boolean>("onboarding_complete").then(v => { if (!v) store.showOnboarding = true }),
   ])
   if (!appliedDefaultTab && store.settings?.default_tab) {
     const validTabs = ["home", "instances", "browse", "console", "servers", "skins", "screenshots"]
@@ -494,6 +507,8 @@ export {
   setShowAccountDropdown,
   setShowFriendsPanel,
   setBrowseSubTab,
+  setShowOnboarding,
+  generateUniqueName,
   navigateBack,
   navigateForward,
   pushToHistory,

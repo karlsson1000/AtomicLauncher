@@ -21,6 +21,7 @@ tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", features = ["json", "multipart"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "sync", "time", "fs", "io-util", "process"] }
 webbrowser = "1.0"
 dirs = "5.0"
@@ -33,7 +34,7 @@ sha1 = "0.10"
 tauri-plugin-shell = "2"
 zip = "2.2"
 sysinfo = "0.30"
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
 base64 = "0.22"
 dotenvy = "0.15"
 open = "5.0"

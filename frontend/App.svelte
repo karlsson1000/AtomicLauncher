@@ -8,6 +8,7 @@
   import InstanceDetailsTab from "./features/instances/InstanceDetailsTab.svelte"
   import ConfirmModal from "./components/ui/ConfirmModal.svelte"
   import AlertModal from "./components/ui/AlertModal.svelte"
+  import OnboardingModal from "./features/onboarding/OnboardingModal.svelte"
   import HomeTab from "./features/home/HomeTab.svelte"
   import InstancesTab from "./features/instances/InstancesTab.svelte"
   import BrowseTab from "./features/browse/BrowseTab.svelte"
@@ -146,5 +147,9 @@
       onSuccess={() => { handleCreationComplete() }}
       onStartCreating={(name) => { handleStartCreating(name) }}
     />
+  {/if}
+
+  {#if store.showOnboarding}
+    <OnboardingModal />
   {/if}
 </div>

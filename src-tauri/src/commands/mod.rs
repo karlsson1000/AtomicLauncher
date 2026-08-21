@@ -12,10 +12,12 @@ pub mod friends;
 pub mod screenshots;
 pub mod packs;
 pub mod trash;
+pub mod import;
 
 pub use auth::*;
 pub use instances::*;
 pub use instance_export::*;
+pub use import::*;
 pub use versions::*;
 pub use mods::*;
 pub use modpacks::*;

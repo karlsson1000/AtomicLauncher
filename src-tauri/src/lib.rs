@@ -269,6 +269,8 @@ pub fn run() {
             get_modpack_game_versions,
             install_modpack_from_file,
             get_modpack_name_from_file,
+            detect_importable_instances,
+            import_instance,
             get_installed_resourcepacks,
             download_resourcepack,
             delete_resourcepack,

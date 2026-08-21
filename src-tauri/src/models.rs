@@ -39,6 +39,21 @@ pub struct Instance {
     pub total_playtime_seconds: u64,
 }
 
+// ===== INSTANCE IMPORT MODELS =====
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ImportableInstance {
+    pub source: String,
+    pub name: String,
+    pub path: String,
+    pub mc_version: Option<String>,
+    pub loader: Option<String>,
+    pub loader_version: Option<String>,
+    pub size_bytes: u64,
+    #[serde(default)]
+    pub icon_path: Option<String>,
+}
+
 // ===== FRIENDS SYSTEM MODELS =====
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
