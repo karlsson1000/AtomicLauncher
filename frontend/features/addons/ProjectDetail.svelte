@@ -276,6 +276,22 @@
   function showInstallSection(): boolean {
     return true
   }
+
+  function getProjectUrl(): string {
+    if (source === "modrinth") {
+      return `https://modrinth.com/project/${projectSlug || projectId}`
+    }
+    const classPath = projectType === "modpack" ? "modpacks"
+      : projectType === "resourcepack" ? "texture-packs"
+      : projectType === "shaderpack" ? "shaders"
+      : "mc-mods"
+    return `https://www.curseforge.com/minecraft/${classPath}/${projectSlug}`
+  }
+
+  function openProjectUrl(e: MouseEvent) {
+    e.preventDefault()
+    invoke("open_url", { url: getProjectUrl() }).catch(() => {})
+  }
 </script>
 
 <div class="h-full relative overflow-hidden">
@@ -309,7 +325,11 @@
             <div class="w-16 h-16 rounded-md bg-gradient-to-br from-[#16a34a]/10 to-[#22c55e]/10 flex items-center justify-center flex-shrink-0"></div>
           {/if}
           <div class="flex-1 min-w-0">
-            <h1 class="text-3xl font-bold text-[var(--text-primary)] truncate">{getTitle()}</h1>
+            <h1 class="text-3xl font-bold text-[var(--text-primary)] truncate">
+              <a href={getProjectUrl()} onclick={openProjectUrl} class="hover:underline">
+                {getTitle()}
+              </a>
+            </h1>
             {#if getAuthor()}
               <p class="text-lg text-[var(--text-muted)]">by {getAuthor()}</p>
             {/if}
