@@ -1,10 +1,10 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core"
-  import { Minus, Square, X, ChevronLeft, ChevronRight, ChevronDown, LogIn, LogOut, Check, Users } from "lucide-svelte"
+  import { Minus, Square, X, ChevronLeft, ChevronRight, ChevronDown, LogIn, LogOut, Check } from "lucide-svelte"
   import {
     store, navigateBack, navigateForward,
     setShowAccountDropdown, loadAccounts, appWindow,
-    setShowFriendsPanel, dragRegion, noDragRegion,
+    dragRegion, noDragRegion,
   } from "../../lib/launcherStore.svelte"
 
   const tabLabels: Record<string, string> = {
@@ -145,17 +145,6 @@
         Sign in
       </button>
     {/if}
-  </div>
-
-  <div class="flex items-center" style={noDragRegion}>
-    <button
-      data-friends-toggle
-      onclick={() => setShowFriendsPanel(!store.showFriendsPanel)}
-      class="h-7 w-7 flex items-center justify-center rounded transition-colors cursor-pointer {store.showFriendsPanel ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'}"
-      title="Friends"
-    >
-      <Users size={16} strokeWidth={2} />
-    </button>
   </div>
 
   <div class="flex items-center" style={noDragRegion}>
