@@ -49,7 +49,8 @@ pub async fn export_instance(
             include_shader_packs,
             include_mods,
             include_config,
-        )?;
+        )
+        .await?;
     } else {
         export_as_zip(
             &mut zip,
@@ -137,12 +138,22 @@ fn export_as_zip(
         if optionsshaders_txt.exists() {
             add_file_to_zip(zip, &optionsshaders_txt, "optionsshaders.txt", options)?;
         }
+
+        let servers_dat = instance_dir.join("servers.dat");
+        if servers_dat.exists() {
+            add_file_to_zip(zip, &servers_dat, "servers.dat", options)?;
+        }
+
+        let servers_dat_old = instance_dir.join("servers.dat_old");
+        if servers_dat_old.exists() {
+            add_file_to_zip(zip, &servers_dat_old, "servers.dat_old", options)?;
+        }
     }
 
     Ok(())
 }
 
-fn export_as_mrpack(
+async fn export_as_mrpack(
     zip: &mut ZipWriter<std::fs::File>,
     instance_name: &str,
     instance_dir: &std::path::Path,
@@ -197,35 +208,128 @@ fn export_as_mrpack(
     if include_mods {
         let mods_dir = instance_dir.join("mods");
         if mods_dir.exists() {
-            add_dir_to_zip_with_prefix(zip, &mods_dir, "overrides/mods", options)?;
+            let mut resolved_files: Vec<serde_json::Value> = Vec::new();
+            let mut override_candidates: Vec<std::path::PathBuf> = Vec::new();
+
+            let mut candidates: Vec<std::path::PathBuf> = Vec::new();
+            if let Ok(entries) = std::fs::read_dir(&mods_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if !path.is_file() {
+                        continue;
+                    }
+                    let is_mod_archive = path
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .map(|e| {
+                            e.eq_ignore_ascii_case("jar")
+                                || e.eq_ignore_ascii_case("zip")
+                                || e.eq_ignore_ascii_case("litemod")
+                        })
+                        .unwrap_or(false);
+                    if is_mod_archive {
+                        candidates.push(path);
+                    } else {
+                        override_candidates.push(path);
+                    }
+                }
+            }
+
+            let client = crate::utils::modrinth::ModrinthClient::new().ok();
+            let mut hashes: Vec<String> = Vec::new();
+            let mut hashed: Vec<(std::path::PathBuf, String)> = Vec::new();
+
+            for path in &candidates {
+                let Ok(bytes) = std::fs::read(path) else {
+                    override_candidates.push(path.clone());
+                    continue;
+                };
+
+                use sha1::{Digest, Sha1};
+                let mut sha1_hasher = Sha1::new();
+                sha1_hasher.update(&bytes);
+                let sha1_hex = format!("{:x}", sha1_hasher.finalize());
+
+                hashes.push(sha1_hex.clone());
+                hashed.push((path.clone(), sha1_hex));
+            }
+
+            let mut resolved_map = std::collections::HashMap::new();
+            if !hashes.is_empty() {
+                if let Some(client) = &client {
+                    if let Ok(map) = client.get_version_files_by_hashes(&hashes).await {
+                        resolved_map = map;
+                    }
+                }
+            }
+
+            for (path, sha1_hex) in hashed {
+                let file_name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+
+                let version_file = resolved_map
+                    .get(&sha1_hex)
+                    .and_then(|response| response.files.iter().find(|f| f.hashes.sha1 == sha1_hex));
+
+                if let Some(vf) = version_file {
+                    let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(vf.size);
+                    resolved_files.push(serde_json::json!({
+                        "path": format!("mods/{}", file_name),
+                        "hashes": {
+                            "sha1": vf.hashes.sha1,
+                            "sha512": vf.hashes.sha512,
+                        },
+                        "env": {
+                            "client": "required",
+                            "server": "required"
+                        },
+                        "downloads": [vf.url],
+                        "fileSize": size
+                    }));
+                } else {
+                    override_candidates.push(path);
+                }
+            }
+
+            manifest["files"] = serde_json::Value::Array(resolved_files);
+
+            for path in override_candidates {
+                let file_name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .ok_or("Invalid mod file name")?;
+                add_file_to_zip(zip, &path, &format!("overrides/mods/{}", file_name), options)?;
+            }
         }
     }
 
     if include_worlds {
         let saves_dir = instance_dir.join("saves");
         if saves_dir.exists() {
-            add_dir_to_zip_with_prefix(zip, &saves_dir, "overrides/saves", options)?;
+            add_dir_to_zip(zip, &saves_dir, "overrides/saves", options)?;
         }
     }
 
     if include_resource_packs {
         let resourcepacks_dir = instance_dir.join("resourcepacks");
         if resourcepacks_dir.exists() {
-            add_dir_to_zip_with_prefix(zip, &resourcepacks_dir, "overrides/resourcepacks", options)?;
+            add_dir_to_zip(zip, &resourcepacks_dir, "overrides/resourcepacks", options)?;
         }
     }
 
     if include_shader_packs {
         let shaderpacks_dir = instance_dir.join("shaderpacks");
         if shaderpacks_dir.exists() {
-            add_dir_to_zip_with_prefix(zip, &shaderpacks_dir, "overrides/shaderpacks", options)?;
+            add_dir_to_zip(zip, &shaderpacks_dir, "overrides/shaderpacks", options)?;
         }
     }
 
     if include_config {
         let config_dir = instance_dir.join("config");
         if config_dir.exists() {
-            add_dir_to_zip_with_prefix(zip, &config_dir, "overrides/config", options)?;
+            add_dir_to_zip(zip, &config_dir, "overrides/config", options)?;
         }
 
         let options_txt = instance_dir.join("options.txt");
@@ -341,11 +445,3 @@ fn add_dir_to_zip(
     Ok(())
 }
 
-fn add_dir_to_zip_with_prefix(
-    zip: &mut ZipWriter<std::fs::File>,
-    dir_path: &std::path::Path,
-    zip_prefix: &str,
-    options: SimpleFileOptions,
-) -> Result<(), String> {
-    add_dir_to_zip(zip, dir_path, zip_prefix, options)
-}
