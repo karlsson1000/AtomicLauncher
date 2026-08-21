@@ -8,6 +8,7 @@
   import InstanceDetailsTab from "./features/instances/InstanceDetailsTab.svelte"
   import ConfirmModal from "./components/ui/ConfirmModal.svelte"
   import AlertModal from "./components/ui/AlertModal.svelte"
+  import ExportModal from "./features/instances/ExportModal.svelte"
   import OnboardingModal from "./features/onboarding/OnboardingModal.svelte"
   import HomeTab from "./features/home/HomeTab.svelte"
   import InstancesTab from "./features/instances/InstancesTab.svelte"
@@ -21,6 +22,7 @@
     setShowSettingsModal, setShowCreateModal, setConfirmModal,
     setAlertModal, loadAllInitialData, setupEventListeners, pushToHistory,
     handleStartCreating, handleCreationComplete, handleCreationError,
+    setExportModal,
   } from "./lib/launcherStore.svelte"
   import { onMount, untrack } from "svelte"
 
@@ -132,6 +134,13 @@
       message={store.alertModal.message}
       type={store.alertModal.type}
       onClose={() => setAlertModal(null)}
+    />
+  {/if}
+
+  {#if store.exportModalInstance}
+    <ExportModal
+      instanceName={store.exportModalInstance.name}
+      onClose={() => setExportModal(null)}
     />
   {/if}
 

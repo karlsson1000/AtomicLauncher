@@ -69,6 +69,7 @@ export const store = $state({
   showFriendsPanel: false,
   browseSubTab: "mods" as BrowseSubTab,
   showOnboarding: false,
+  exportModalInstance: null as Instance | null,
 })
 
 const appWindow = getCurrentWindow()
@@ -396,6 +397,7 @@ function setShowOnboarding(v: boolean) {
   store.showOnboarding = v
   if (!v) storeSet("onboarding_complete", true)
 }
+function setExportModal(v: Instance | null) { store.exportModalInstance = v }
 function generateUniqueName(base: string): string {
   let candidate = base
   let counter = 1
@@ -508,6 +510,7 @@ export {
   setShowFriendsPanel,
   setBrowseSubTab,
   setShowOnboarding,
+  setExportModal,
   generateUniqueName,
   navigateBack,
   navigateForward,

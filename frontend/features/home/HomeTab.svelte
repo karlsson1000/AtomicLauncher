@@ -1,6 +1,5 @@
 <script lang="ts">
   import { Package, ExternalLink, FolderOpen, Copy, FileArchive, Trash2, Play, ChevronRight } from "lucide-svelte"
-  import ExportModal from "../instances/ExportModal.svelte"
   import { invoke } from "@tauri-apps/api/core"
   import type { Instance, Snapshot, SnapshotsResponse } from "../../types"
   import { getMinecraftVersion } from "../../lib/version"
@@ -11,10 +10,10 @@
     handleLaunch, handleDeleteInstance, handleShowDetails,
     handleOpenInstanceFolderByInstance, handleDuplicateInstance,
     handleKillInstance, handleNavigateToInstances,
+    setExportModal,
   } from "../../lib/launcherStore.svelte"
 
   let contextMenu = $state<{ x: number; y: number; instance: Instance } | null>(null)
-  let exportModalInstance = $state<Instance | null>(null)
   let snapshots = $state<Snapshot[]>([])
   let loadingSnapshots = $state(true)
   let instanceIcons = $state<Record<string, string | null>>({})
@@ -320,16 +319,10 @@
         { label: "Open", icon: Package, onClick: () => handleShowDetails(cm.instance) },
         { label: "Open Folder", icon: FolderOpen, onClick: () => handleOpenInstanceFolderByInstance(cm.instance) },
         { label: "Duplicate", icon: Copy, onClick: () => handleDuplicateInstance(cm.instance) },
-        { label: "Export", icon: FileArchive, onClick: () => { exportModalInstance = cm.instance; contextMenu = null } },
+        { label: "Export", icon: FileArchive, onClick: () => { setExportModal(cm.instance); contextMenu = null } },
         { separator: true },
         { label: "Delete", icon: Trash2, onClick: () => handleDeleteInstance(cm.instance.name), danger: true },
       ]}
-    />
-  {/if}
-  {#if exportModalInstance}
-    <ExportModal
-      instanceName={exportModalInstance.name}
-      onClose={() => exportModalInstance = null}
     />
   {/if}
 </div>

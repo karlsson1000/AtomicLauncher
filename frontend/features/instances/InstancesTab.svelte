@@ -1,6 +1,5 @@
 <script lang="ts">
   import { Package, FolderOpen, Copy, FileArchive, FolderSymlink, FolderX, Trash2, Play, Search, Plus, FolderPlus, ChevronDown, ChevronUp } from "lucide-svelte"
-  import ExportModal from "./ExportModal.svelte"
   import { invoke } from "@tauri-apps/api/core"
   import type { Instance } from "../../types"
   import { getMinecraftVersion } from "../../lib/version"
@@ -10,6 +9,7 @@
     store, setSelectedInstance, handleLaunch, handleCreateNew,
     handleShowDetails, handleOpenInstanceFolderByInstance,
     handleDuplicateInstance, handleDeleteInstance, handleKillInstance,
+    setExportModal,
   } from "../../lib/launcherStore.svelte"
   import { storeGet, storeSet } from "../../lib/store"
 
@@ -206,7 +206,7 @@
       { label: "Open", icon: Package, onClick: () => { setSelectedInstance(cm.instance); handleShowDetails(cm.instance) } },
       { label: "Open Folder", icon: FolderOpen, onClick: () => handleOpenInstanceFolderByInstance(cm.instance) },
       { label: "Duplicate", icon: Copy, onClick: () => handleDuplicateInstance(cm.instance) },
-      { label: "Export", icon: FileArchive, onClick: () => { exportModalInstance = cm.instance; contextMenu = null } },
+      { label: "Export", icon: FileArchive, onClick: () => { setExportModal(cm.instance); contextMenu = null } },
       { separator: true },
       { label: "Create group", icon: FolderPlus, onClick: () => { groupModalInstance = cm.instance; groupModalValue = ""; showGroupModal = true; contextMenu = null } },
     ]
@@ -535,10 +535,4 @@
       </div>
     </div>
   </div>
-{/if}
-{#if exportModalInstance}
-  <ExportModal
-    instanceName={exportModalInstance.name}
-    onClose={() => exportModalInstance = null}
-  />
 {/if}
