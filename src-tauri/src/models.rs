@@ -9,8 +9,8 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub struct AppConfig {
     pub microsoft_client_id: String,
-    pub supabase_url: String,
-    pub supabase_key: String,
+    pub database_url: String,
+    pub database_key: String,
 }
 
 // ===== PUBLIC API MODELS =====

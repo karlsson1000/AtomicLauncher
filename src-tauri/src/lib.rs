@@ -7,12 +7,25 @@ mod models;
 use tauri::Manager;
 use tauri_plugin_updater::UpdaterExt;
 use services::accounts::AccountManager;
-use services::friends::FriendsService;
 use models::{AppConfig, FriendStatus};
-use tauri_plugin_store::StoreExt;
 use std::sync::Arc;
 
 use commands::*;
+
+async fn set_all_accounts_offline(app: &tauri::AppHandle) {
+    let Ok(accounts) = AccountManager::get_all_accounts() else {
+        return;
+    };
+    for account in accounts {
+        let _ = services::friends::set_status_for_account(
+            app,
+            &account.uuid,
+            FriendStatus::Offline,
+            None,
+        )
+        .await;
+    }
+}
 
 #[tauri::command]
 fn get_app_version() -> String {
@@ -51,39 +64,12 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
         .map_err(|e| format!("Failed to install update: {}", e))
 }
 
-#[tauri::command]
-async fn save_secrets(
-    app: tauri::AppHandle,
-    microsoft_client_id: String,
-    supabase_url: String,
-    supabase_key: String,
-) -> Result<(), String> {
-    let store = app.store("secrets.json").map_err(|e| e.to_string())?;
-    store.set("microsoft_client_id", serde_json::Value::String(microsoft_client_id));
-    store.set("supabase_url", serde_json::Value::String(supabase_url));
-    store.set("supabase_key", serde_json::Value::String(supabase_key));
-    store.save().map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[tauri::command]
-async fn is_secrets_configured(app: tauri::AppHandle) -> Result<bool, String> {
-    let store = app.store("secrets.json").map_err(|e| e.to_string())?;
-
-    let configured = |key: &str| -> bool {
-        store.get(key).is_some_and(|v| v.as_str().is_some_and(|s| !s.is_empty()))
-    };
-
-    Ok(configured("microsoft_client_id") && configured("supabase_url") && configured("supabase_key"))
-}
-
 pub struct CurseforgeConfig {
     pub api_key: Arc<str>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    if let Err(e) = dotenvy::dotenv() {
+pub fn run() {    if let Err(e) = dotenvy::dotenv() {
         eprintln!("Warning: Could not load .env file: {}", e);
     }
 
@@ -93,28 +79,20 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .setup(move |app| {
-            let store = app.store("secrets.json")?;
+            let microsoft_client_id =
+                std::env::var("MICROSOFT_CLIENT_ID").unwrap_or_else(|_| env!("MICROSOFT_CLIENT_ID").to_string());
 
-            let microsoft_client_id = store
-                .get("microsoft_client_id")
-                .and_then(|v| v.as_str().map(|s| s.to_string()))
-                .unwrap_or_else(|| env!("MICROSOFT_CLIENT_ID").to_string());
+            let database_url =
+                std::env::var("DATABASE_URL").unwrap_or_else(|_| env!("DATABASE_URL").to_string());
 
-            let supabase_url = store
-                .get("supabase_url")
-                .and_then(|v| v.as_str().map(|s| s.to_string()))
-                .unwrap_or_else(|| env!("SUPABASE_URL").to_string());
-
-            let supabase_key = store
-                .get("supabase_key")
-                .and_then(|v| v.as_str().map(|s| s.to_string()))
-                .unwrap_or_else(|| env!("SUPABASE_SERVICE_KEY").to_string());
+            let database_key =
+                std::env::var("DATABASE_ANON_KEY").unwrap_or_else(|_| env!("DATABASE_ANON_KEY").to_string());
 
             let client_id = microsoft_client_id.clone();
             app.manage(AppConfig {
                 microsoft_client_id,
-                supabase_url,
-                supabase_key,
+                database_url,
+                database_key,
             });
 
             let curseforge_api_key = env!("CURSEFORGE_API_KEY").to_string();
@@ -146,28 +124,15 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
 
-                let app_handle = window.app_handle();
-                let config = app_handle.state::<AppConfig>();
-                let supabase_url = config.supabase_url.clone();
-                let supabase_key = config.supabase_key.clone();
+                let app_handle = window.app_handle().clone();
                 let window = window.clone();
 
                 tauri::async_runtime::spawn(async move {
-                    let accounts = AccountManager::get_all_accounts()
-                        .map_err(|e| e.to_string())
-                        .ok();
-                    if let Some(accounts) = accounts {
-                        let service = FriendsService::new(&supabase_url, &supabase_key)
-                            .map_err(|e| e.to_string())
-                            .ok();
-                        if let Some(service) = service {
-                            for account in &accounts {
-                                let _ = service
-                                    .update_status(&account.uuid, FriendStatus::Offline, None)
-                                    .await;
-                            }
-                        }
-                    }
+                    let _ = tokio::time::timeout(
+                        tokio::time::Duration::from_secs(5),
+                        set_all_accounts_offline(&app_handle),
+                    )
+                    .await;
                     let _ = window.destroy();
                 });
             }
@@ -192,7 +157,6 @@ pub fn run() {
             get_friends,
             remove_friend,
             update_user_status,
-            update_specific_user_status,
             register_user_in_friends_system,
             upload_skin,
             reset_skin,
@@ -289,8 +253,6 @@ pub fn run() {
             open_url,
             get_system_info,
             get_storage_usage,
-            save_secrets,
-            is_secrets_configured,
             search_curseforge_mods,
             get_curseforge_mod_files,
             get_curseforge_mod_details,

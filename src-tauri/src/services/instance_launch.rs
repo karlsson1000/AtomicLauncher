@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
 use std::{fs, path::PathBuf};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use zip::ZipArchive;
 
 struct ResolvedProfile {
@@ -1089,15 +1089,15 @@ impl super::instance::InstanceManager {
 
         let instance_name_for_status = instance_name.to_string();
         let launching_uuid = uuid.to_string();
-        let config = app_handle.state::<crate::models::AppConfig>();
-        let supabase_url = config.supabase_url.clone();
-        let supabase_key = config.supabase_key.clone();
+        let app_handle_for_status = app_handle.clone();
         tauri::async_runtime::spawn(async move {
-            let service = match crate::services::friends::FriendsService::new(&supabase_url, &supabase_key) {
-                Ok(s) => s,
-                Err(_) => return,
-            };
-            let _ = service.update_status(&launching_uuid, crate::models::FriendStatus::InGame, Some(instance_name_for_status)).await;
+            let _ = crate::services::friends::set_status_for_account(
+                &app_handle_for_status,
+                &launching_uuid,
+                crate::models::FriendStatus::InGame,
+                Some(instance_name_for_status),
+            )
+            .await;
         });
 
         if let Some(stdout) = child.stdout.take() {
@@ -1257,15 +1257,15 @@ impl super::instance::InstanceManager {
         }
 
         let uuid_owned = uuid.to_string();
-        let config = app_handle.state::<crate::models::AppConfig>();
-        let supabase_url = config.supabase_url.clone();
-        let supabase_key = config.supabase_key.clone();
+        let app_handle_for_status = app_handle.clone();
         tauri::async_runtime::spawn(async move {
-            let service = match crate::services::friends::FriendsService::new(&supabase_url, &supabase_key) {
-                Ok(s) => s,
-                Err(_) => return,
-            };
-            let _ = service.update_status(&uuid_owned, crate::models::FriendStatus::Online, None).await;
+            let _ = crate::services::friends::set_status_for_account(
+                &app_handle_for_status,
+                &uuid_owned,
+                crate::models::FriendStatus::Online,
+                None,
+            )
+            .await;
         });
 
         let _ = app_handle.emit("instance-exited", serde_json::json!({
