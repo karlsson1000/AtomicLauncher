@@ -9,6 +9,8 @@ use tauri::Manager;
 
 const SESSION_REFRESH_MARGIN_SECS: i64 = 60;
 
+static EXCHANGE: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 lazy_static! {
     static ref SESSION_CACHE: Mutex<HashMap<String, (String, DateTime<Utc>)>> =
         Mutex::new(HashMap::new());
@@ -270,6 +272,17 @@ pub async fn get_session_token(
     app: &tauri::AppHandle,
     account_uuid: &str,
 ) -> Result<String, String> {
+    {
+        let cache = SESSION_CACHE.lock().map_err(|_| "Session cache poisoned")?;
+        if let Some((token, expiry)) = cache.get(account_uuid) {
+            if *expiry > Utc::now() + ChronoDuration::seconds(SESSION_REFRESH_MARGIN_SECS) {
+                return Ok(token.clone());
+            }
+        }
+    }
+
+    let _exchange_guard = EXCHANGE.lock().await;
+
     {
         let cache = SESSION_CACHE.lock().map_err(|_| "Session cache poisoned")?;
         if let Some((token, expiry)) = cache.get(account_uuid) {
