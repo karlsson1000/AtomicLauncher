@@ -17,13 +17,15 @@ async fn set_all_accounts_offline(app: &tauri::AppHandle) {
         return;
     };
     for account in accounts {
-        let _ = services::friends::set_status_for_account(
-            app,
-            &account.uuid,
-            FriendStatus::Offline,
-            None,
-        )
-        .await;
+        if services::friends::has_live_session(&account.uuid) {
+            let _ = services::friends::set_status_for_account(
+                app,
+                &account.uuid,
+                FriendStatus::Offline,
+                None,
+            )
+            .await;
+        }
     }
 }
 
@@ -126,10 +128,11 @@ pub fn run() {    if let Err(e) = dotenvy::dotenv() {
 
                 let app_handle = window.app_handle().clone();
                 let window = window.clone();
+                let _ = window.hide();
 
                 tauri::async_runtime::spawn(async move {
                     let _ = tokio::time::timeout(
-                        tokio::time::Duration::from_secs(5),
+                        tokio::time::Duration::from_secs(1),
                         set_all_accounts_offline(&app_handle),
                     )
                     .await;

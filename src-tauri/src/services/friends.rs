@@ -327,6 +327,15 @@ pub async fn get_session_token(
     Ok(token)
 }
 
+pub fn has_live_session(account_uuid: &str) -> bool {
+    let Ok(cache) = SESSION_CACHE.lock() else {
+        return false;
+    };
+    cache
+        .get(account_uuid)
+        .is_some_and(|(_, expiry)| *expiry > Utc::now() + ChronoDuration::seconds(SESSION_REFRESH_MARGIN_SECS))
+}
+
 pub async fn set_status_for_account(
     app: &tauri::AppHandle,
     account_uuid: &str,
