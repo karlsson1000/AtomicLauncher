@@ -714,6 +714,30 @@ impl super::instance::InstanceManager {
         })
     }
 
+    fn extract_native_jar(
+        archive: &mut ZipArchive<fs::File>,
+        natives_dir: &PathBuf,
+    ) -> std::io::Result<usize> {
+        let mut extracted = 0;
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i)?;
+            if file.name().ends_with('/') || file.name().starts_with("META-INF") {
+                continue;
+            }
+            let Some(safe_name) = file.enclosed_name() else {
+                continue;
+            };
+            let outpath = natives_dir.join(safe_name);
+            if let Some(parent) = outpath.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            let mut outfile = fs::File::create(&outpath)?;
+            std::io::copy(&mut file, &mut outfile)?;
+            extracted += 1;
+        }
+        Ok(extracted)
+    }
+
     fn step_extract_natives(
         instance_name: &str,
         resolved: &ResolvedProfile,
@@ -761,22 +785,9 @@ impl super::instance::InstanceManager {
                         if native_path.exists() {
                             if let Ok(file) = fs::File::open(&native_path) {
                                 if let Ok(mut archive) = ZipArchive::new(file) {
-                                    for i in 0..archive.len() {
-                                        if let Ok(mut file) = archive.by_index(i) {
-                                            let file_name = file.name().to_string();
-                                            if file_name.ends_with('/') || file_name.starts_with("META-INF") {
-                                                continue;
-                                            }
-                                            let outpath = natives_dir.join(&file_name);
-                                            if let Some(parent) = outpath.parent() {
-                                                let _ = fs::create_dir_all(parent);
-                                            }
-                                            if let Ok(mut outfile) = fs::File::create(&outpath) {
-                                                if std::io::copy(&mut file, &mut outfile).is_ok() {
-                                                    natives_extracted += 1;
-                                                }
-                                            }
-                                        }
+                                    match Self::extract_native_jar(&mut archive, &natives_dir) {
+                                        Ok(count) => natives_extracted += count,
+                                        Err(e) => Self::emit_error_log(app_handle, instance_name, &format!("Native extraction failed: {}", e)),
                                     }
                                 } else {
                                     Self::emit_error_log(app_handle, instance_name, &format!("Failed to open native archive for {}", library.name));
@@ -825,22 +836,9 @@ impl super::instance::InstanceManager {
                         if native_path.exists() {
                             if let Ok(file) = fs::File::open(&native_path) {
                                 if let Ok(mut archive) = ZipArchive::new(file) {
-                                    for i in 0..archive.len() {
-                                        if let Ok(mut file) = archive.by_index(i) {
-                                            let file_name = file.name().to_string();
-                                            if file_name.ends_with('/') || file_name.starts_with("META-INF") {
-                                                continue;
-                                            }
-                                            let outpath = natives_dir.join(&file_name);
-                                            if let Some(parent) = outpath.parent() {
-                                                let _ = fs::create_dir_all(parent);
-                                            }
-                                            if let Ok(mut outfile) = fs::File::create(&outpath) {
-                                                if std::io::copy(&mut file, &mut outfile).is_ok() {
-                                                    natives_extracted += 1;
-                                                }
-                                            }
-                                        }
+                                    match Self::extract_native_jar(&mut archive, &natives_dir) {
+                                        Ok(count) => natives_extracted += count,
+                                        Err(e) => Self::emit_error_log(app_handle, instance_name, &format!("Native extraction failed: {}", e)),
                                     }
                                 } else {
                                     Self::emit_error_log(app_handle, instance_name, &format!("Failed to open native archive for classifier {}", key));

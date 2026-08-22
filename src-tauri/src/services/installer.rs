@@ -55,14 +55,44 @@ impl MinecraftInstaller {
         Ok(())
     }
 
-    async fn download_file(&self, url: &str, path: &PathBuf) -> Result<(), DownloadError> {
+    async fn download_file(
+        &self,
+        url: &str,
+        path: &PathBuf,
+        expected_sha1: Option<&str>,
+    ) -> Result<(), DownloadError> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
 
         let response = self.http_client.get(url).send().await?;
+
+        if !response.status().is_success() {
+            return Err(format!("HTTP {} downloading {}", response.status(), url).into());
+        }
+
         let bytes = response.bytes().await?;
+        Self::verify_sha1(&bytes, expected_sha1)
+            .map_err(|e| format!("{}: {}", url, e))?;
         fs::write(path, bytes)?;
+
+        Ok(())
+    }
+
+    fn sha1_hex(bytes: &[u8]) -> String {
+        let mut hasher = Sha1::new();
+        hasher.update(bytes);
+        format!("{:x}", hasher.finalize())
+    }
+
+    fn verify_sha1(bytes: &[u8], expected_sha1: Option<&str>) -> Result<(), DownloadError> {
+        let Some(expected) = expected_sha1.filter(|s| !s.is_empty()) else {
+            return Ok(());
+        };
+
+        if Self::sha1_hex(bytes) != expected {
+            return Err("SHA-1 checksum mismatch".into());
+        }
 
         Ok(())
     }
@@ -72,15 +102,12 @@ impl MinecraftInstaller {
             return true;
         }
 
-        let Some(expected_sha1) = expected_sha1 else {
+        let Some(expected_sha1) = expected_sha1.filter(|s| !s.is_empty()) else {
             return false;
         };
 
         if let Ok(contents) = fs::read(path) {
-            let mut hasher = Sha1::new();
-            hasher.update(&contents);
-            let hash = format!("{:x}", hasher.finalize());
-            hash != expected_sha1
+            Self::sha1_hex(&contents) != expected_sha1
         } else {
             true
         }
@@ -96,7 +123,7 @@ impl MinecraftInstaller {
             return Ok(false);
         }
 
-        self.download_file(url, path).await?;
+        self.download_file(url, path, Some(expected_sha1)).await?;
         Ok(true)
     }
 
@@ -384,6 +411,8 @@ impl MinecraftInstaller {
         }
         
         let bytes = response.bytes().await?;
+        Self::verify_sha1(&bytes, Some(expected_sha1))
+            .map_err(|e| format!("{}: {}", url, e))?;
         fs::write(path, bytes)?;
 
         Ok(true)
