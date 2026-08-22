@@ -122,7 +122,6 @@ impl NeoForgeInstaller {
         Ok(mc_versions)
     }
 
-    #[allow(dead_code)]
     pub async fn get_compatible_loader_for_minecraft(
         &self,
         minecraft_version: &str,

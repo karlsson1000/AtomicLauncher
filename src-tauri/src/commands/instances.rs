@@ -382,28 +382,6 @@ pub async fn launch_world(
 }
 
 #[tauri::command]
-pub async fn launch_instance(
-    instance_name: String,
-    username: String,
-    uuid: String,
-    access_token: String,
-    app_handle: tauri::AppHandle,
-) -> Result<(), String> {
-    let safe_name = sanitize_instance_name(&instance_name)?;
-    
-    if !username.chars().all(|c| c.is_alphanumeric() || c == '_') {
-        return Err("Invalid username format".to_string());
-    }
-    
-    if !uuid.chars().all(|c| c.is_alphanumeric() || c == '-') || uuid.len() > 36 {
-        return Err("Invalid UUID format".to_string());
-    }
-    
-    InstanceManager::launch(&safe_name, &username, &uuid, &access_token, app_handle)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 pub async fn set_instance_icon(
     instance_name: String,
     image_data: String,
