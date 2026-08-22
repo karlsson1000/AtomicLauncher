@@ -82,7 +82,7 @@
   let viewer = $state<skinview3d.SkinViewer | null>(null)
   let skinResetTimeout: ReturnType<typeof setTimeout> | undefined
   let dragState = { active: false, startX: 0, startRot: 0.3 }
-  let lastProfileFetch = 0
+  let lastProfileFetch: Record<string, number> = {}
   let lastCapeFetch: Record<string, number> = {}
   let originalState = { skinUrl: null as string | null, variant: 'classic' as 'classic' | 'slim', activeCape: null as string | null }
   let pendingSkinOp: { type: 'upload'; base64: string; variant: 'classic' | 'slim' } | { type: 'recent'; url: string; variant: 'classic' | 'slim' } | { type: 'reset' } | null = null
@@ -157,9 +157,9 @@
       }
 
       if (!forceRefresh && cacheValid) { applyCached(); loading = false; loadCapes(); return }
-      if (!canFetch(lastProfileFetch)) { applyCached(); loading = false; loadCapes(); return }
+      if (!canFetch(lastProfileFetch[store.activeAccount.uuid] ?? 0)) { applyCached(); loading = false; loadCapes(); return }
 
-      lastProfileFetch = now
+      lastProfileFetch[store.activeAccount.uuid] = now
       const skinData = await invoke<{ url: string; variant: string }>("get_current_skin")
       if (skinData?.url) {
         const variant = skinData.variant === "slim" ? "slim" : "classic"
