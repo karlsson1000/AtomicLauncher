@@ -70,6 +70,9 @@ export const store = $state({
   addonsSubTab: "mods" as AddonsSubTab,
   showOnboarding: false,
   exportModalInstance: null as Instance | null,
+  showSearchPalette: false,
+  settingsScrollTarget: null as string | null,
+  pendingAddonsSearch: null as string | null,
 })
 
 const appWindow = getCurrentWindow()
@@ -393,6 +396,9 @@ function setShowFriendsPanel(v: boolean) {
   storeSet("friends_panel_open", v)
 }
 function setAddonsSubTab(v: AddonsSubTab) { store.addonsSubTab = v }
+function setShowSearchPalette(v: boolean) {
+  store.showSearchPalette = v
+}
 function setShowOnboarding(v: boolean) {
   store.showOnboarding = v
   if (!v) storeSet("onboarding_complete", true)
@@ -510,6 +516,7 @@ export {
   setShowAccountDropdown,
   setShowFriendsPanel,
   setAddonsSubTab,
+  setShowSearchPalette,
   setShowOnboarding,
   setExportModal,
   generateUniqueName,

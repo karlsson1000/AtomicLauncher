@@ -10,6 +10,7 @@
   import AlertModal from "./components/ui/AlertModal.svelte"
   import ExportModal from "./features/instances/ExportModal.svelte"
   import OnboardingModal from "./features/onboarding/OnboardingModal.svelte"
+  import GlobalSearch from "./components/ui/GlobalSearch.svelte"
   import HomeTab from "./features/home/HomeTab.svelte"
   import InstancesTab from "./features/instances/InstancesTab.svelte"
   import AddonsTab from "./features/addons/AddonsTab.svelte"
@@ -22,9 +23,22 @@
     setShowSettingsModal, setShowCreateModal, setConfirmModal,
     setAlertModal, loadAllInitialData, setupEventListeners, pushToHistory,
     handleStartCreating, handleCreationComplete, handleCreationError,
-    setExportModal,
+    setExportModal, setShowSearchPalette,
   } from "./lib/launcherStore.svelte"
   import { onMount, untrack } from "svelte"
+
+  function handleGlobalKeydown(e: KeyboardEvent) {
+    const key = e.key.toLowerCase()
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && key === "f") {
+      e.preventDefault()
+      setShowSearchPalette(!store.showSearchPalette)
+    }
+  }
+
+  $effect(() => {
+    window.addEventListener("keydown", handleGlobalKeydown)
+    return () => window.removeEventListener("keydown", handleGlobalKeydown)
+  })
 
   onMount(() => {
     setTimeout(async () => {
@@ -161,4 +175,6 @@
   {#if store.showOnboarding}
     <OnboardingModal />
   {/if}
+
+  <GlobalSearch />
 </div>

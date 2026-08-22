@@ -70,6 +70,16 @@
       loadJavaInstallations()
       loadAppVersion()
       loadStorageUsage()
+
+      const target = store.settingsScrollTarget
+      if (target) {
+        setTimeout(() => {
+          document
+            .getElementById(`settings-${target}`)
+            ?.scrollIntoView({ behavior: "smooth", block: "start" })
+        }, 60)
+        store.settingsScrollTarget = null
+      }
     }
 
     return () => {
@@ -285,7 +295,7 @@
 
         <div class="flex-1 overflow-y-auto p-5 space-y-6">
           <!-- Memory -->
-          <div class="space-y-2">
+          <div id="settings-memory" class="space-y-2">
             <div class="flex items-center gap-2 text-[var(--text-primary)]">
               <Cpu size={16} class="text-[var(--accent-primary)]" />
               <span class="font-medium text-sm">Memory Allocation</span>
@@ -316,7 +326,7 @@
           </div>
 
           <!-- Java -->
-          <div class="space-y-2 min-w-0">
+          <div id="settings-java" class="space-y-2 min-w-0">
             <div class="flex items-center gap-2 text-[var(--text-primary)]">
               <Coffee size={16} class="text-[var(--accent-primary)]" />
               <span class="font-medium text-sm">Java Runtime</span>
@@ -380,7 +390,7 @@
           </div>
 
           <!-- Appearance -->
-          <div class="space-y-2">
+          <div id="settings-appearance" class="space-y-2">
             <div class="flex items-center gap-2 text-[var(--text-primary)]">
               <Paintbrush size={16} class="text-[var(--accent-primary)]" />
               <span class="font-medium text-sm">Theme</span>
@@ -403,7 +413,7 @@
           </div>
 
           <!-- Background -->
-          <div class="space-y-2">
+          <div id="settings-background" class="space-y-2">
             <div class="flex items-center gap-2 text-[var(--text-primary)]">
               <ImagePlus size={16} class="text-[var(--accent-primary)]" />
               <span class="font-medium text-sm">Background</span>
@@ -465,7 +475,7 @@
           </div>
 
           <!-- Console -->
-          <div class="space-y-2">
+          <div id="settings-console" class="space-y-2">
             <div class="flex items-center gap-2 text-[var(--text-primary)]">
               <Terminal size={16} class="text-[var(--accent-primary)]" />
               <span class="font-medium text-sm">Console</span>
@@ -488,7 +498,7 @@
           </div>
 
           <!-- Game Directory -->
-          <div class="space-y-2">
+          <div id="settings-directory" class="space-y-2">
             <div class="flex items-center gap-2 text-[var(--text-primary)]">
               <FolderOpen size={16} class="text-[var(--accent-primary)]" />
               <span class="font-medium text-sm">Game Directory</span>
@@ -507,7 +517,7 @@
           </div>
 
           <!-- Storage Overview -->
-          <div class="space-y-2">
+          <div id="settings-storage" class="space-y-2">
             <div class="flex items-center justify-between text-[var(--text-primary)]">
               <div class="flex items-center gap-2">
                 <FolderOpen size={16} class="text-[var(--accent-primary)]" />

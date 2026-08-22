@@ -25,6 +25,13 @@
   let instanceIcons = $state<Record<string, string | null>>({})
   const moddedInstances = $derived(store.instances.filter(i => i.loader === "fabric" || i.loader === "neoforge" || i.loader === "forge"))
 
+  $effect(() => {
+    if (store.pendingAddonsSearch !== null) {
+      searchQuery = store.pendingAddonsSearch
+      store.pendingAddonsSearch = null
+    }
+  })
+
   const tabs = [
     { id: "mods" as const, label: "Mods", icon: Puzzle, color: "text-[#16a34a]" },
     { id: "modpacks" as const, label: "Modpacks", icon: Layers, color: "text-[#3b82f6]" },
