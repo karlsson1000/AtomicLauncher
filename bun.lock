@@ -7,19 +7,20 @@
       "dependencies": {
         "@tauri-apps/api": "2.11.0",
         "@tauri-apps/plugin-dialog": "2.7.1",
-        "@tauri-apps/plugin-store": "^2.4.3",
-        "marked": "^18.0.5",
+        "@tauri-apps/plugin-store": "^2.4.4",
+        "dompurify": "^3.4.14",
+        "marked": "^18.0.7",
         "skinview3d": "^3.4.2",
       },
       "devDependencies": {
-        "@sveltejs/vite-plugin-svelte": "^7.1.2",
-        "@tailwindcss/vite": "^4.3.0",
-        "@tauri-apps/cli": "^2.11.2",
-        "@types/node": "^25.9.2",
+        "@sveltejs/vite-plugin-svelte": "^7.2.0",
+        "@tailwindcss/vite": "^4.3.3",
+        "@tauri-apps/cli": "^2.11.4",
+        "@types/node": "^25.9.5",
         "lucide-svelte": "^1.0.1",
-        "svelte": "^5.56.4",
+        "svelte": "^5.56.8",
         "typescript": "~5.8.3",
-        "vite": "^7.3.5",
+        "vite": "^7.3.6",
       },
     },
   },
@@ -225,6 +226,8 @@
     "detect-libc": ["detect-libc@2.1.2", "", {}, "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ=="],
 
     "devalue": ["devalue@5.8.1", "", {}, "sha512-4CXDYRBGqN+57wVJkuXBYmpAVUSg3L6JAQa/DFqm238G73E1wuyc/JhGQJzN7vUf/CMphYau2zXbfWzDR5aTEw=="],
+
+    "dompurify": ["dompurify@3.4.14", "", { "optionalDependencies": { "@types/trusted-types": "^2.0.7" } }, "sha512-dVoH9z+MY+C9IilgGCk3YfFqjLi3fChm2OiKJMzh6axrJ5qwxqWaZamgmHrpv22CN/KdbZJuGEGgfQoL00LTdg=="],
 
     "enhanced-resolve": ["enhanced-resolve@5.24.5", "", { "dependencies": { "graceful-fs": "^4.2.4", "tapable": "^2.3.3" } }, "sha512-L1l8TNvomm6UVW5B253AGxQagSQr+vGwhMlrrfRS2qmhx46AMpMVJKQYLvWYbysTMY8VoicOvzHzoHMbyzB+4A=="],
 

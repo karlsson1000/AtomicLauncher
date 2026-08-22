@@ -7,6 +7,7 @@
     CurseforgeModDetail, CurseforgeFile, CurseforgeGetModFilesResult
   } from "../../types"
   import { getMinecraftVersion } from "../../lib/version"
+  import { sanitizeHtml } from "../../lib/sanitize"
 
   let {
     source,
@@ -59,8 +60,8 @@
   let renderedBody = $state("")
 
   let bodyHtml = $derived.by(() => {
-    if (renderedBody) return renderedBody
-    if (curseforgeDetails?.description) return curseforgeDetails.description
+    if (renderedBody) return sanitizeHtml(renderedBody)
+    if (curseforgeDetails?.description) return sanitizeHtml(curseforgeDetails.description)
     return ""
   })
 

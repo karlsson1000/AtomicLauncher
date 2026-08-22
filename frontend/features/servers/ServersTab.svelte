@@ -5,6 +5,7 @@
   import ConfirmModal from "../../components/ui/ConfirmModal.svelte"
   import type { ServerInfo, McSrvStatResponse } from "../../types"
   import { store } from "../../lib/launcherStore.svelte"
+  import { sanitizeHtml } from "../../lib/sanitize"
 
   let servers: ServerInfo[] = $state([])
   let searchQuery = $state("")
@@ -65,7 +66,7 @@
         players_list: data.players?.list,
         version: data.version || data.protocol?.name,
         motd: data.motd?.clean?.join("\n"),
-        motd_html: data.motd?.html,
+        motd_html: data.motd?.html?.map(sanitizeHtml),
         favicon: data.icon ? `https://api.mcsrvstat.us/icon/${fullAddress}` : undefined,
         last_checked: Date.now(),
         ping,
