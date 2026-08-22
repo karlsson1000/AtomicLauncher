@@ -208,7 +208,7 @@
       { label: "Duplicate", icon: Copy, onClick: () => handleDuplicateInstance(cm.instance) },
       { label: "Export", icon: FileArchive, onClick: () => { setExportModal(cm.instance); contextMenu = null } },
       { separator: true },
-      { label: "Create group", icon: FolderPlus, onClick: () => { groupModalInstance = cm.instance; groupModalValue = ""; showGroupModal = true; contextMenu = null } },
+      { label: "Add to group", icon: FolderPlus, onClick: () => { groupModalInstance = cm.instance; groupModalValue = ""; showGroupModal = true; contextMenu = null } },
     ]
     if (contextMenuInstanceGroup !== DEFAULT_GROUP) {
       items.push({ label: "Remove from group", icon: FolderX, onClick: () => { handleRemoveFromGroup(cm.instance); contextMenu = null }, danger: true })
@@ -487,39 +487,51 @@
 
 {#if showGroupModal && groupModalInstance}
   {@const gmi = groupModalInstance}
+  {@const otherGroups = namedGroups.filter(g => g !== instanceToGroup.get(gmi.name))}
   <div
     role="presentation"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm modal-backdrop"
     onclick={() => showGroupModal = false}
     onkeydown={(e) => { if (e.key === 'Escape') showGroupModal = false }}
   >
     <div
       role="presentation"
-      class="bg-[var(--bg-secondary)] rounded-lg p-5 w-80 shadow-xl"
+      class="blur-border bg-[var(--bg-secondary)] rounded-lg w-80 shadow-xl modal-content p-4"
       onclick={(e) => e.stopPropagation()}
     >
-      <h3 class="text-sm font-semibold text-[var(--text-primary)] mb-3">Create group</h3>
-      <input
-        bind:this={groupModalInputEl}
-        type="text"
-        placeholder="Group name"
-        bind:value={groupModalValue}
-        onkeydown={(e) => {
-          if (e.key === "Enter" && groupModalValue.trim()) {
-            handleCreateGroup(gmi, groupModalValue)
-            showGroupModal = false
-          }
-          if (e.key === "Escape") showGroupModal = false
-        }}
-        class="w-full bg-[var(--bg-tertiary)] text-[var(--text-primary)] placeholder-[var(--text-muted)] rounded-md px-3 py-2 text-sm outline-none border border-transparent focus:border-[var(--accent-primary)] transition-colors"
-      />
-      <div class="flex justify-end gap-2 mt-4">
-        <button
-          onclick={() => showGroupModal = false}
-          class="px-3 py-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
-        >
-          Cancel
-        </button>
+      <h3 class="text-base font-semibold text-[var(--text-primary)] tracking-tight">Add to group</h3>
+      <p class="text-xs text-[var(--text-muted)] mt-0.5 mb-3">Move "{gmi.name}" into a group</p>
+
+      {#if otherGroups.length > 0}
+        <div class="flex flex-col gap-y-0.5 max-h-48 overflow-y-auto custom-scrollbar mb-1">
+          {#each otherGroups as g (g)}
+            <button
+              onclick={() => { handleCreateGroup(gmi, g); showGroupModal = false }}
+              class="flex items-center gap-2.5 px-2 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover-light)] rounded-md transition-colors cursor-pointer text-left"
+            >
+              <FolderOpen size={16} strokeWidth={2} class="text-[var(--text-muted)] flex-shrink-0" />
+              <span class="truncate">{g}</span>
+            </button>
+          {/each}
+          <div class="h-px bg-[var(--border-subtle)] my-2"></div>
+        </div>
+      {/if}
+
+      <div class="flex gap-2">
+        <input
+          bind:this={groupModalInputEl}
+          type="text"
+          placeholder="New group name"
+          bind:value={groupModalValue}
+          onkeydown={(e) => {
+            if (e.key === "Enter" && groupModalValue.trim()) {
+              handleCreateGroup(gmi, groupModalValue)
+              showGroupModal = false
+            }
+            if (e.key === "Escape") showGroupModal = false
+          }}
+          class="flex-1 min-w-0 bg-[var(--bg-tertiary)] text-[var(--text-primary)] placeholder-[var(--text-muted)] rounded-md px-3 py-2 text-sm outline-none border border-transparent transition-colors"
+        />
         <button
           onclick={() => {
             if (groupModalValue.trim()) {
