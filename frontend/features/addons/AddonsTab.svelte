@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Search, Check, Puzzle, Layers, Image, Sparkles, Package } from "lucide-svelte"
+  import { Search, Check, Puzzle, Layers, Image, Sparkles, Package, X } from "lucide-svelte"
   import { invoke } from "@tauri-apps/api/core"
   import AddonList from "./AddonList.svelte"
   import ProjectDetail from "./ProjectDetail.svelte"
@@ -95,9 +95,10 @@
     </div>
   </div>
 
-  <div class="flex-shrink-0 px-8 pb-4">
-    <div class="max-w-7xl mx-auto">
-      <div class="flex gap-2 items-stretch">
+  {#if !viewDetail}
+    <div class="flex-shrink-0 px-8 pb-4">
+      <div class="max-w-7xl mx-auto">
+        <div class="flex gap-2 items-stretch">
         <div class="relative">
           <button
             onclick={() => showSourceDropdown = !showSourceDropdown}
@@ -135,13 +136,22 @@
             type="text"
             placeholder={ADDON_CATEGORIES[store.addonsSubTab].placeholder}
             bind:value={searchQuery}
-            class="w-full bg-transparent rounded-md pl-10 pr-4 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none transition-all relative z-10"
+            class="w-full bg-transparent rounded-md pl-10 pr-10 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none transition-all relative z-10"
           />
+          {#if searchQuery}
+            <button
+              onclick={() => (searchQuery = "")}
+              class="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 h-6 w-6 flex items-center justify-center rounded transition-colors cursor-pointer text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+            >
+              <X size={16} strokeWidth={2} />
+            </button>
+          {/if}
         </div>
 
+        </div>
       </div>
     </div>
-  </div>
+  {/if}
 
   <div class="flex-1 min-h-0 px-8 overflow-hidden">
     <div class="h-full max-w-7xl mx-auto grid grid-cols-1 {viewDetail ? '' : 'lg:grid-cols-11 gap-2'}">
