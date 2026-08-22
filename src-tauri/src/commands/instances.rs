@@ -8,6 +8,36 @@ use std::sync::Mutex;
 use crate::commands::validation::sanitize_instance_name;
 use tauri::{Emitter, Manager};
 use base64::{Engine as _, engine::general_purpose};
+use std::path::PathBuf;
+
+fn resolve_world_dir(instance_name: &str, folder_name: &str) -> Result<PathBuf, String> {
+    let safe_name = sanitize_instance_name(instance_name)?;
+
+    if folder_name.is_empty()
+        || folder_name.starts_with('.')
+        || folder_name.contains("..")
+        || folder_name.contains('/')
+        || folder_name.contains('\\')
+    {
+        return Err("Invalid world folder name".to_string());
+    }
+
+    let saves_dir = get_instance_dir(&safe_name).join("saves");
+    let world_dir = saves_dir.join(folder_name);
+
+    let canonical_world = world_dir
+        .canonicalize()
+        .map_err(|_| format!("World folder '{}' does not exist", folder_name))?;
+    let canonical_saves = saves_dir
+        .canonicalize()
+        .map_err(|e| e.to_string())?;
+
+    if canonical_world.parent() != Some(canonical_saves.as_path()) {
+        return Err("Invalid world folder name".to_string());
+    }
+
+    Ok(world_dir)
+}
 
 #[tauri::command]
 pub async fn create_instance(
@@ -726,34 +756,14 @@ pub fn open_worlds_folder(instance_name: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn open_world_folder(instance_name: String, folder_name: String) -> Result<(), String> {
-    let safe_name = sanitize_instance_name(&instance_name)?;
-    
-    if folder_name.contains("..") || folder_name.contains("/") || folder_name.contains("\\") {
-        return Err("Invalid folder name".to_string());
-    }
-    
-    let world_dir = get_instance_dir(&safe_name).join("saves").join(&folder_name);
-
-    if !world_dir.exists() {
-        return Err(format!("World folder '{}' does not exist", folder_name));
-    }
+    let world_dir = resolve_world_dir(&instance_name, &folder_name)?;
 
     open_folder(world_dir).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn delete_world(instance_name: String, folder_name: String) -> Result<(), String> {
-    let safe_name = sanitize_instance_name(&instance_name)?;
-    
-    if folder_name.contains("..") || folder_name.contains("/") || folder_name.contains("\\") {
-        return Err("Invalid folder name".to_string());
-    }
-    
-    let world_dir = get_instance_dir(&safe_name).join("saves").join(&folder_name);
-
-    if !world_dir.exists() {
-        return Err(format!("World folder '{}' does not exist", folder_name));
-    }
+    let world_dir = resolve_world_dir(&instance_name, &folder_name)?;
 
     std::fs::remove_dir_all(&world_dir)
         .map_err(|e| e.to_string())

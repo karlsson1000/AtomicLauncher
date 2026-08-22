@@ -677,7 +677,7 @@ pub async fn download_curseforge_file(
         "mods" => sanitize_mod_filename(&filename)?,
         "resourcepacks" => sanitize_resourcepack_filename(&filename)?,
         "shaderpacks" => sanitize_shaderpack_filename(&filename)?,
-        _ => sanitize_filename(&filename)?,
+        _ => return Err("Invalid target folder".to_string()),
     };
     let _ = validate_download_url(&download_url)?;
 

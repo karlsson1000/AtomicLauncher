@@ -107,6 +107,7 @@ pub struct RecentSkin {
 }
 
 fn get_recent_skins_path(account_uuid: &str) -> Result<PathBuf, String> {
+    crate::commands::validation::validate_uuid(account_uuid)?;
     let launcher_dir = crate::utils::get_launcher_dir();
     let skins_dir = launcher_dir.join("recent_skins");
     
