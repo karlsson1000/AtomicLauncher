@@ -106,29 +106,4 @@ impl InstanceManager {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    pub fn rename(old_name: &str, new_name: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let old_dir = get_instance_dir(old_name);
-        let new_dir = get_instance_dir(new_name);
-
-        if !old_dir.exists() {
-            return Err(format!("Instance '{}' does not exist", old_name).into());
-        }
-
-        if new_dir.exists() {
-            return Err(format!("Instance '{}' already exists", new_name).into());
-        }
-
-        fs::rename(&old_dir, &new_dir)?;
-
-        let instance_json = new_dir.join("instance.json");
-        let mut instance: Instance = serde_json::from_str(&fs::read_to_string(&instance_json)?)?;
-
-        instance.name = new_name.to_string();
-
-        let updated_json = serde_json::to_string_pretty(&instance)?;
-        fs::write(instance_json, updated_json)?;
-
-        Ok(())
-    }
 }

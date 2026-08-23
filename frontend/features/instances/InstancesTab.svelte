@@ -36,7 +36,6 @@
   let collapsed = $state<Record<string, boolean>>({})
   let groupModalInstance = $state<Instance | null>(null)
   let groupModalValue = $state("")
-  let exportModalInstance = $state<Instance | null>(null)
   let groupModalInputEl: HTMLInputElement | undefined = $state()
 
   $effect(() => {

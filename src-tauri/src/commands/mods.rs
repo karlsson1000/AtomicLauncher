@@ -479,23 +479,6 @@ pub async fn search_mods(
 }
 
 #[tauri::command]
-pub async fn get_mod_details(id_or_slug: String) -> Result<ModrinthProjectDetails, String> {
-    if !id_or_slug.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
-        return Err("Invalid mod ID or slug format".to_string());
-    }
-    
-    if id_or_slug.len() > 100 {
-        return Err("Mod ID or slug too long".to_string());
-    }
-    
-    let client = ModrinthClient::new().map_err(|e| e.to_string())?;
-    client
-        .get_project(&id_or_slug)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 pub async fn get_project_details(id_or_slug: String) -> Result<ModrinthProjectDetails, String> {
     if !id_or_slug.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
         return Err("Invalid project ID or slug format".to_string());

@@ -384,8 +384,6 @@ pub struct AssetIndexData {
 #[derive(Debug, Deserialize)]
 pub struct AssetObject {
     pub hash: String,
-    #[allow(dead_code)]
-    pub size: u64,
 }
 
 // ===== FABRIC LOADER MODELS =====

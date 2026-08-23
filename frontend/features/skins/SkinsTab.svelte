@@ -139,7 +139,7 @@
   function getCapeImageName(alias: string) { return CAPE_IMAGE_MAP[alias.toLowerCase()] ?? "unknown" }
 
   async function loadUserSkin(forceRefresh = false) {
-    if (!store.isAuthenticated || !store.activeAccount || !invoke) {
+    if (!store.isAuthenticated || !store.activeAccount) {
       loading = false; error = "Please sign in to view your skin"; return
     }
     try {

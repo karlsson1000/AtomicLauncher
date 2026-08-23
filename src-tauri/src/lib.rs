@@ -208,7 +208,6 @@ pub fn run() {    if let Err(e) = dotenvy::dotenv() {
             get_launcher_directory,
             open_instance_folder,
             search_mods,
-            get_mod_details,
             get_mod_versions,
             download_mod,
             get_project_details,

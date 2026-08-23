@@ -250,10 +250,8 @@ fn add_server_to_instance(
     server_port: u16,
 ) -> Result<(), String> {
     let servers_dat = instance_dir.join("servers.dat");
-    
-    let existing_exists = servers_dat.exists();
-    
-    if existing_exists {
+
+    if servers_dat.exists() {
         return Ok(());
     }
     
