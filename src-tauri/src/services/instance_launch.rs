@@ -320,14 +320,17 @@ impl super::instance::InstanceManager {
         instance: &Instance,
         app_handle: &tauri::AppHandle,
     ) -> Result<(String, LauncherSettings), Box<dyn std::error::Error>> {
-        let global_settings = crate::services::settings::SettingsManager::load()
+        let mut effective_settings = crate::services::settings::SettingsManager::load()
             .unwrap_or_default();
 
-        let effective_settings = if let Some(override_settings) = &instance.settings_override {
-            override_settings.clone()
-        } else {
-            global_settings
-        };
+        if let Some(override_settings) = &instance.settings_override {
+            effective_settings.memory_mb = override_settings.memory_mb;
+            if let Some(java) = override_settings.java_path.as_deref() {
+                if !java.trim().is_empty() {
+                    effective_settings.java_path = Some(java.to_string());
+                }
+            }
+        }
 
         let java_path = if let Some(custom_java) = &effective_settings.java_path {
             custom_java.clone()
@@ -1033,7 +1036,11 @@ impl super::instance::InstanceManager {
 
         let mut cmd = Command::new(java_path);
         cmd.arg(format!("-Xms{}M", xms))
-            .arg(format!("-Xmx{}M", effective_settings.memory_mb));
+            .arg(format!("-Xmx{}M", effective_settings.memory_mb))
+            .arg("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump")
+            .arg("-Dminecraft.launcher.brand=octane-launcher")
+            .arg(format!("-Dminecraft.launcher.version={}", env!("CARGO_PKG_VERSION")))
+            .arg("-DFabricMcEmu=net.minecraft.client.main.Main");
 
         if resolved.is_neoforge || resolved.is_forge {
             for arg in &resolved.jvm_arguments {

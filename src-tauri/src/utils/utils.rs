@@ -78,17 +78,17 @@ pub fn get_trash_index_path() -> PathBuf {
 
 pub fn find_java() -> Option<String> {
     if let Ok(java_home) = std::env::var("JAVA_HOME") {
-        let java_bin = if cfg!(windows) { "java.exe" } else { "java" };
-        let java_path = PathBuf::from(&java_home).join("bin").join(java_bin);
-        if java_path.exists() {
-            return Some(java_path.to_string_lossy().to_string());
-        }
         #[cfg(target_os = "windows")]
         {
             let javaw_path = PathBuf::from(&java_home).join("bin").join("javaw.exe");
             if javaw_path.exists() {
                 return Some(javaw_path.to_string_lossy().to_string());
             }
+        }
+        let java_bin = if cfg!(windows) { "java.exe" } else { "java" };
+        let java_path = PathBuf::from(&java_home).join("bin").join(java_bin);
+        if java_path.exists() {
+            return Some(java_path.to_string_lossy().to_string());
         }
     }
 
@@ -118,6 +118,15 @@ pub fn find_java() -> Option<String> {
                     if let Some(first) = paths.lines().next() {
                         let trimmed = first.trim().to_string();
                         if !trimmed.is_empty() {
+                            let candidate = PathBuf::from(&trimmed);
+                            if candidate.file_name().and_then(|f| f.to_str()) == Some("java.exe") {
+                                if let Some(parent) = candidate.parent() {
+                                    let javaw = parent.join("javaw.exe");
+                                    if javaw.exists() {
+                                        return Some(javaw.to_string_lossy().to_string());
+                                    }
+                                }
+                            }
                             return Some(trimmed);
                         }
                     }
@@ -139,10 +148,10 @@ pub fn find_java() -> Option<String> {
             r"C:\Program Files\BellSoft",
             r"C:\Program Files\Amazon Corretto",
         ];
-        if let Some(path) = scan_jvm_dirs(&search_roots, "bin\\java.exe") {
+        if let Some(path) = scan_jvm_dirs(&search_roots, "bin\\javaw.exe") {
             return Some(path);
         }
-        if let Some(path) = scan_jvm_dirs(&search_roots, "bin\\javaw.exe") {
+        if let Some(path) = scan_jvm_dirs(&search_roots, "bin\\java.exe") {
             return Some(path);
         }
         if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
