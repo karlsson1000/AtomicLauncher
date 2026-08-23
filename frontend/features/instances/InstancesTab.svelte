@@ -359,7 +359,7 @@
                             else handleQuickLaunch(instance)
                           }}
                           disabled={store.launchingInstanceName !== null && !isRunning}
-                          class="flex-shrink-0 w-12 h-12 mr-4 flex items-center justify-center rounded transition-all active:scale-95 cursor-pointer {(isRunning || isLaunching) ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'opacity-0 group-hover:opacity-100 bg-[#16a34a] hover:bg-[#15803d] text-[#181a1f]'} disabled:opacity-50"
+                          class="flex-shrink-0 w-12 h-12 mr-4 flex items-center justify-center rounded transition-all cursor-pointer {(isRunning || isLaunching) ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'opacity-0 group-hover:opacity-100 bg-[#16a34a] hover:bg-[#15803d] text-[#181a1f]'} disabled:opacity-50"
                         >
                           {#if isLaunching || isRunning}
                             <div class="w-5 h-5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin"></div>
@@ -444,7 +444,7 @@
                             else handleQuickLaunch(instance)
                           }}
                           disabled={store.launchingInstanceName !== null && !isRunning}
-                          class="flex-shrink-0 w-12 h-12 mr-4 flex items-center justify-center rounded transition-all active:scale-95 cursor-pointer {(isRunning || isLaunching) ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'opacity-0 group-hover:opacity-100 bg-[#16a34a] hover:bg-[#15803d] text-[#181a1f]'} disabled:opacity-50"
+                          class="flex-shrink-0 w-12 h-12 mr-4 flex items-center justify-center rounded transition-all cursor-pointer {(isRunning || isLaunching) ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'opacity-0 group-hover:opacity-100 bg-[#16a34a] hover:bg-[#15803d] text-[#181a1f]'} disabled:opacity-50"
                         >
                           {#if isLaunching || isRunning}
                             <div class="w-5 h-5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin"></div>

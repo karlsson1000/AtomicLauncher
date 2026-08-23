@@ -439,7 +439,7 @@
                 onclick={e => handleLaunchServer(server, e)}
                 disabled={!isOnline || isLaunching || isAnyInstanceRunning}
                 title={!isOnline ? "Server offline" : isAnyInstanceRunning ? "Instance already running" : undefined}
-                class="flex-shrink-0 h-10 px-8 flex items-center justify-center gap-3 rounded transition-all active:scale-95 cursor-pointer {isLaunching || isAnyInstanceRunning ? 'bg-red-500/10 text-red-400 cursor-not-allowed' : isOnline ? 'bg-[#16a34a] hover:bg-[#15803d] text-[#181a1f]' : 'bg-[var(--bg-hover-strong)] text-[var(--text-muted)] cursor-not-allowed'} disabled:opacity-50"
+                class="flex-shrink-0 h-10 px-8 flex items-center justify-center gap-3 rounded transition-all cursor-pointer {isLaunching || isAnyInstanceRunning ? 'bg-red-500/10 text-red-400 cursor-not-allowed' : isOnline ? 'bg-[#16a34a] hover:bg-[#15803d] text-[#181a1f]' : 'bg-[var(--bg-hover-strong)] text-[var(--text-muted)] cursor-not-allowed'} disabled:opacity-50"
               >
                 {#if isLaunching || isAnyInstanceRunning}
                   <div class="w-5 h-5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin"></div>

@@ -158,7 +158,7 @@
 }
 
 .cursor-pointer:active:not(.no-scale) {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 
 input[type="range"]::-webkit-slider-thumb {

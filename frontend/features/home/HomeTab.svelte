@@ -143,7 +143,7 @@
               : handleLaunch(lastPlayedInstance)
             }
             disabled={heroDisabled}
-            class="h-11 px-5 rounded-md flex items-center justify-center gap-3 text-lg font-semibold transition-all active:scale-95 cursor-pointer disabled:opacity-40 {heroBtnClass}"
+            class="h-11 px-5 rounded-md flex items-center justify-center gap-3 text-lg font-semibold transition-all cursor-pointer disabled:opacity-40 {heroBtnClass}"
             title={isLastPlayedRunning ? "Stop" : `Play ${lastPlayedInstance.name}`}
           >
             {#if isLastPlayedLaunching || isLastPlayedRunning}
@@ -242,7 +242,7 @@
                 else handleLaunch(instance)
               }}
               disabled={store.launchingInstanceName !== null && !isLaunching && !isRunning}
-              class="absolute right-2 flex-shrink-0 w-10 h-10 flex items-center justify-center rounded transition-all active:scale-90 {(isRunning || isLaunching) ? 'bg-red-500/10 text-red-400 opacity-100 hover:bg-red-500/20 cursor-pointer' : store.launchingInstanceName !== null ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100 bg-[#16a34a] hover:bg-[#15803d] text-[#181a1f] cursor-pointer'}"
+              class="absolute right-2 flex-shrink-0 w-10 h-10 flex items-center justify-center rounded transition-all {(isRunning || isLaunching) ? 'bg-red-500/10 text-red-400 opacity-100 hover:bg-red-500/20 cursor-pointer' : store.launchingInstanceName !== null ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100 bg-[#16a34a] hover:bg-[#15803d] text-[#181a1f] cursor-pointer'}"
               title={isRunning ? "Stop instance" : "Launch instance"}
             >
               {#if isLaunching || isRunning}
