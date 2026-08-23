@@ -240,26 +240,62 @@ impl super::instance::InstanceManager {
         world_name: Option<&str>,
         app_handle: tauri::AppHandle,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        {
+            let mut processes = crate::commands::instances::RUNNING_PROCESSES
+                .lock()
+                .map_err(|e| format!("Failed to acquire process lock: {}", e))?;
+            if processes.contains_key(instance_name) {
+                let err_msg = format!("Instance '{}' is already running", instance_name);
+                Self::emit_error_log(&app_handle, instance_name, &err_msg);
+                return Err(err_msg.into());
+            }
+            processes.insert(instance_name.to_string(), 0);
+        }
+
+        let outcome = Self::perform_launch(
+            instance_name, username, uuid, access_token, server_address, world_name, &app_handle,
+        );
+
+        if outcome.is_err() {
+            if let Ok(mut processes) = crate::commands::instances::RUNNING_PROCESSES.lock() {
+                if processes.get(instance_name) == Some(&0) {
+                    processes.remove(instance_name);
+                }
+            }
+        }
+
+        outcome
+    }
+
+    fn perform_launch(
+        instance_name: &str,
+        username: &str,
+        uuid: &str,
+        access_token: &str,
+        server_address: Option<&str>,
+        world_name: Option<&str>,
+        app_handle: &tauri::AppHandle,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let meta_dir = get_meta_dir();
         let instance_dir = get_instance_dir(instance_name);
 
         if !instance_dir.exists() {
             let err_msg = format!("Instance '{}' does not exist", instance_name);
-            Self::emit_error_log(&app_handle, instance_name, &err_msg);
+            Self::emit_error_log(app_handle, instance_name, &err_msg);
             return Err(err_msg.into());
         }
 
-        let (instance, version) = Self::step_load_instance(instance_name, &instance_dir, &app_handle)?;
-        let (java_path, effective_settings) = Self::step_resolve_java(instance_name, &instance, &app_handle)?;
+        let (instance, version) = Self::step_load_instance(instance_name, &instance_dir, app_handle)?;
+        let (java_path, effective_settings) = Self::step_resolve_java(instance_name, &instance, app_handle)?;
         let required_java = Self::get_required_java_version(&version);
-        Self::step_check_java(instance_name, &version, &java_path, required_java, &app_handle)?;
-        let resolved = Self::step_resolve_profile(instance_name, &version, &meta_dir, &app_handle)?;
-        Self::step_extract_natives(instance_name, &resolved, &meta_dir, &app_handle)?;
-        let classpath = Self::step_build_classpath(instance_name, &resolved.libraries, &meta_dir, &app_handle)?;
+        Self::step_check_java(instance_name, &version, &java_path, required_java, app_handle)?;
+        let resolved = Self::step_resolve_profile(instance_name, &version, &meta_dir, app_handle)?;
+        Self::step_extract_natives(instance_name, &resolved, &meta_dir, app_handle)?;
+        let classpath = Self::step_build_classpath(instance_name, &resolved.libraries, &meta_dir, app_handle)?;
         Self::step_launch(
             instance_name, username, uuid, access_token, server_address, world_name,
             &instance, &version, &java_path, &resolved,
-            &classpath, &instance_dir, &meta_dir, &app_handle,
+            &classpath, &instance_dir, &meta_dir, app_handle,
             &effective_settings,
         )?;
         Ok(())
