@@ -1,12 +1,21 @@
 <script lang="ts">
   import { Loader2, CheckCircle, XCircle } from "lucide-svelte"
   import { listen } from "@tauri-apps/api/event"
+  import { showToast } from "../../lib/toastStore.svelte"
 
   interface ProgressPayload {
     instance: string
     progress: number
     stage?: string
     current_file?: string
+  }
+
+  type ProgressKind = "creation" | "duplication" | "modpack"
+
+  const KIND_LABELS: Record<ProgressKind, { done: string; failed: string }> = {
+    creation: { done: "created", failed: `Failed to create` },
+    duplication: { done: "duplicated", failed: `Failed to duplicate` },
+    modpack: { done: "installed", failed: `Failed to install` },
   }
 
   let { instanceName, onError, onDismiss }: {
@@ -18,6 +27,7 @@
   let progress = $state(0)
   let stage = $state("")
   let status = $state<"creating" | "success" | "error">("creating")
+  let kind = $state<ProgressKind>("creation")
   let hasReceivedProgress = $state(false)
 
   let isCompleting = false
@@ -35,22 +45,24 @@
   $effect(() => {
     const setupListeners = async () => {
       try {
-        const handleProgress = (e: { payload: ProgressPayload }) => {
+        const makeHandler = (progressKind: ProgressKind) => (e: { payload: ProgressPayload }) => {
           if (e.payload.instance !== instanceName) return
           hasReceivedProgress = true
           lastProgressTime = Date.now()
           progress = e.payload.progress
           if (e.payload.stage) stage = e.payload.stage
+          kind = progressKind
           if (e.payload.progress >= 100 && !isCompleting) {
             isCompleting = true
             status = "success"
+            showToast("success", `${instanceName} ${KIND_LABELS[progressKind].done}`)
           }
         }
 
         const [u1, u2, u3] = await Promise.all([
-          listen<ProgressPayload>("duplication-progress", handleProgress),
-          listen<ProgressPayload>("creation-progress", handleProgress),
-          listen<ProgressPayload>("modpack-install-progress", handleProgress),
+          listen<ProgressPayload>("duplication-progress", makeHandler("duplication")),
+          listen<ProgressPayload>("creation-progress", makeHandler("creation")),
+          listen<ProgressPayload>("modpack-install-progress", makeHandler("modpack")),
         ])
 
         unlistenFns = [u1, u2, u3]
@@ -60,12 +72,14 @@
             clearInterval(errorTimer)
             status = "error"
             stage = "Operation timed out"
+            showToast("error", `${KIND_LABELS[kind].failed} ${instanceName}`)
             onError()
           }
         }, 5000)
       } catch {
         status = "error"
         stage = "Failed to initialize"
+        showToast("error", `Failed to start ${instanceName}`)
         onError()
       }
     }

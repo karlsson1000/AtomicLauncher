@@ -11,6 +11,7 @@
   import ExportModal from "./features/instances/ExportModal.svelte"
   import OnboardingModal from "./features/onboarding/OnboardingModal.svelte"
   import GlobalSearch from "./components/ui/GlobalSearch.svelte"
+  import Toaster from "./components/ui/Toaster.svelte"
   import HomeTab from "./features/home/HomeTab.svelte"
   import InstancesTab from "./features/instances/InstancesTab.svelte"
   import AddonsTab from "./features/addons/AddonsTab.svelte"
@@ -177,4 +178,6 @@
   {/if}
 
   <GlobalSearch />
+
+  <Toaster />
 </div>

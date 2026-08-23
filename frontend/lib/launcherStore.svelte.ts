@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import type { Instance, LauncherSettings, ConsoleLog, AccountInfo, UpdateInfo } from "../types"
 import { storeGet, storeSet } from "./store"
+import { showToast } from "./toastStore.svelte"
 
 type ActiveTab = "home" | "instances" | "addons" | "console" | "servers" | "skins" | "screenshots"
 type AddonsSubTab = "mods" | "modpacks" | "resourcepacks" | "shaderpacks"
@@ -247,6 +248,7 @@ async function handleLaunch(instance: Instance) {
     store.launchingInstanceName = null
   } catch (error) {
     console.error("Launch error:", error)
+    showToast("error", `Failed to launch ${instance.name}: ${String(error)}`)
     store.consoleLogs = [...store.consoleLogs, { instance: instance.name, message: `ERROR: ${String(error)}`, type: "stderr" }]
     store.launchingInstanceName = null
   }
