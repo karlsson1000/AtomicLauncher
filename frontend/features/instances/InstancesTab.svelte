@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Package, FolderOpen, Copy, FileArchive, FolderSymlink, FolderX, Trash2, Play, Search, Plus, FolderPlus, ChevronDown, ChevronUp } from "lucide-svelte"
+  import { Package, FolderOpen, Copy, FileArchive, FolderSymlink, FolderX, Trash2, Play, Search, Plus, FolderPlus, ChevronDown, ChevronUp, Save, ClipboardCheck } from "lucide-svelte"
   import { invoke } from "@tauri-apps/api/core"
   import type { Instance } from "../../types"
   import { getMinecraftVersion } from "../../lib/version"
@@ -12,6 +12,25 @@
     setExportModal,
   } from "../../lib/launcherStore.svelte"
   import { storeGet, storeSet } from "../../lib/store"
+  import { showToast } from "../../lib/toastStore.svelte"
+
+  async function handleSetDefaultOptions(name: string) {
+    try {
+      await invoke("save_options_as_default", { instanceName: name })
+      showToast("success", "Options saved", 5000)
+    } catch (error) {
+      showToast("error", `Failed to save options: ${error}`, 6000)
+    }
+  }
+
+  async function handleResetOptions(name: string) {
+    try {
+      await invoke("apply_saved_options", { instanceName: name })
+      showToast("success", "Saved options applied", 4000)
+    } catch (error) {
+      showToast("error", `Failed to apply options: ${error}`, 6000)
+    }
+  }
 
   type SortOption = "recently-played" | "name-asc" | "name-desc"
 
@@ -206,6 +225,9 @@
       { label: "Open Folder", icon: FolderOpen, onClick: () => handleOpenInstanceFolderByInstance(cm.instance) },
       { label: "Duplicate", icon: Copy, onClick: () => handleDuplicateInstance(cm.instance) },
       { label: "Export", icon: FileArchive, onClick: () => { setExportModal(cm.instance); contextMenu = null } },
+      { separator: true },
+      { label: "Save Options as Default", icon: Save, onClick: () => { handleSetDefaultOptions(cm.instance.name); contextMenu = null } },
+      { label: "Apply Saved Options", icon: ClipboardCheck, onClick: () => { handleResetOptions(cm.instance.name); contextMenu = null } },
       { separator: true },
       { label: "Add to group", icon: FolderPlus, onClick: () => { groupModalInstance = cm.instance; groupModalValue = ""; showGroupModal = true; contextMenu = null } },
     ]

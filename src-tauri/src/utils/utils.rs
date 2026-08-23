@@ -76,6 +76,10 @@ pub fn get_trash_index_path() -> PathBuf {
     get_trash_dir().join("trash_index.json")
 }
 
+pub fn get_default_options_path() -> PathBuf {
+    get_launcher_dir().join("default-options.txt")
+}
+
 pub fn find_java() -> Option<String> {
     if let Ok(java_home) = std::env::var("JAVA_HOME") {
         #[cfg(target_os = "windows")]
