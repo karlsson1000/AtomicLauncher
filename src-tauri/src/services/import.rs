@@ -84,8 +84,6 @@ impl InstanceImporter {
                     vec![
                         data_dir.join("ModrinthApp").join("profiles"),
                         data_dir.join("com.modrinth.ModrinthApp").join("profiles"),
-                        data_dir.join("com.modrinth.theseus").join("profiles"),
-                        data_dir.join("theseus").join("profiles"),
                     ],
                 ));
                 let mut curseforge_roots = Vec::new();
@@ -115,7 +113,6 @@ impl InstanceImporter {
                     vec![
                         data_dir.join("ModrinthApp").join("profiles"),
                         data_dir.join("com.modrinth.ModrinthApp").join("profiles"),
-                        data_dir.join("com.modrinth.theseus").join("profiles"),
                     ],
                 ));
             }
