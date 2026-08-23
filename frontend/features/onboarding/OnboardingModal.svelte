@@ -1,7 +1,8 @@
 <script lang="ts">
   import { Loader2, CheckCircle2, XCircle, ArrowRight, ArrowLeft } from "lucide-svelte"
   import { onMount } from "svelte"
-  import { fade } from "svelte/transition"
+  import { fade, fly } from "svelte/transition"
+  import { cubicIn, cubicOut } from "svelte/easing"
   import { invoke } from "@tauri-apps/api/core"
   import type { ImportableInstance } from "../../types"
   import { formatFileSize } from "../../lib/format"
@@ -13,7 +14,12 @@
     generateUniqueName,
   } from "../../lib/launcherStore.svelte"
 
-  let step = $state<"welcome" | "import" | "done">("welcome")
+  type OnboardingStep = "welcome" | "import" | "done"
+
+  const STEP_ORDER: Record<OnboardingStep, number> = { welcome: 0, import: 1, done: 2 }
+
+  let step = $state<OnboardingStep>("welcome")
+  let navDir = $state(1)
   let detected = $state<ImportableInstance[]>([])
   let isDetecting = $state(true)
   let detectFailed = $state(false)
@@ -66,7 +72,7 @@
     try {
       await invoke("microsoft_login_and_store")
       await loadAccounts()
-      if (store.activeAccount) step = "import"
+      if (store.activeAccount) goTo("import")
     } catch {}
     isSigningIn = false
   }
@@ -118,16 +124,22 @@
     await loadInstances()
     store.creatingInstanceName = null
     isImporting = false
-    step = "done"
+    goTo("done")
   }
 
   function finish() {
     setShowOnboarding(false)
   }
 
+  function goTo(next: OnboardingStep) {
+    if (next === step) return
+    navDir = STEP_ORDER[next] > STEP_ORDER[step] ? 1 : -1
+    step = next
+  }
+
   function skipStep() {
-    if (step === "welcome") step = "import"
-    else if (step === "import") step = "done"
+    if (step === "welcome") goTo("import")
+    else if (step === "import") goTo("done")
   }
 
   let selectedCount = $derived(getSelectedItems().length)
@@ -144,6 +156,12 @@
 </script>
 
 <div transition:fade={{ duration: 150 }} class="fixed inset-0 z-50 bg-[var(--bg-primary)] flex flex-col overflow-hidden">
+  {#if step === "welcome"}
+    <div class="absolute inset-0 pointer-events-none select-none" transition:fade={{ duration: 250 }}>
+      <img src="/logo.png" alt="" aria-hidden="true" class="absolute left-1/2 -translate-x-[16vmin] -bottom-[60vmin] w-[150vmin] h-[150vmin] object-contain opacity-[0.04]" />
+    </div>
+  {/if}
+
   <header class="flex items-center justify-between px-8 py-6 flex-shrink-0">
     <div class="flex items-center gap-2">
       <img src="/logo.png" alt="Octane" class="h-5 w-5" />
@@ -159,9 +177,9 @@
   </header>
 
   <main class="flex-1 min-h-0 flex items-center justify-center px-8 pb-16">
-    <div class="w-full max-w-lg">
+    <div class="grid w-full max-w-lg">
       {#if step === "welcome"}
-        <div class="text-center">
+        <div class="col-start-1 row-start-1 flex flex-col justify-center text-center" in:fly={{ x: 72 * navDir, duration: 420, delay: 200, easing: cubicOut }} out:fly={{ x: -72 * navDir, duration: 300, easing: cubicIn }}>
           <h1 class="text-3xl font-semibold text-[var(--text-primary)] tracking-tight">Welcome to Octane</h1>
           <p class="mt-3 text-sm text-[var(--text-muted)] leading-relaxed">
             Sign in with Microsoft to play with friends, or continue without an account.
@@ -177,12 +195,13 @@
               <Loader2 size={15} class="animate-spin" />
               Waiting for browser...
             {:else}
+              <img src="/microsoft.svg" alt="" aria-hidden="true" class="w-[18px] h-[18px]" />
               Sign in with Microsoft
             {/if}
           </button>
         </div>
       {:else if step === "import"}
-        <div>
+        <div class="col-start-1 row-start-1 flex flex-col justify-center" in:fly={{ x: 72 * navDir, duration: 420, delay: 200, easing: cubicOut }} out:fly={{ x: -72 * navDir, duration: 300, easing: cubicIn }}>
           <h1 class="text-2xl font-semibold text-[var(--text-primary)] tracking-tight text-center">
             {#if isDetecting}
               Looking for your instances
@@ -242,7 +261,7 @@
 
           <div class="mt-10 flex items-center justify-between">
             <button
-              onclick={() => (step = "welcome")}
+              onclick={() => goTo("welcome")}
               disabled={isImporting}
               class="flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer disabled:opacity-40"
             >
@@ -265,7 +284,7 @@
                 </button>
               {:else}
                 <button
-                  onclick={() => (step = "done")}
+                  onclick={() => goTo("done")}
                   class="flex items-center gap-1.5 px-5 py-1.5 rounded-md bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-sm font-medium transition-colors cursor-pointer"
                 >
                   Get started
@@ -276,9 +295,11 @@
           </div>
         </div>
       {:else}
-        <div class="text-center">
-          <CheckCircle2 size={36} class="mx-auto text-[#16a34a]" strokeWidth={1.5} />
-          <h1 class="mt-6 text-2xl font-semibold text-[var(--text-primary)] tracking-tight">You're all set</h1>
+        <div class="col-start-1 row-start-1 flex flex-col justify-center text-center" in:fly={{ x: 72 * navDir, duration: 420, delay: 200, easing: cubicOut }} out:fly={{ x: -72 * navDir, duration: 300, easing: cubicIn }}>
+          <svg class="onboard-check mx-auto" viewBox="0 0 72 72" aria-hidden="true">
+            <path d="M22 37 L32 47 L50 27"/>
+          </svg>
+          <h1 class="mt-1 text-2xl font-semibold text-[var(--text-primary)] tracking-tight">You're all set</h1>
           <p class="mt-3 text-sm text-[var(--text-muted)] leading-relaxed">
             {#if importedCount > 0}
               Imported {importedCount} {importedCount === 1 ? "instance" : "instances"} from your other launchers.
@@ -288,7 +309,7 @@
           </p>
           <button
             onclick={finish}
-            class="mt-10 px-8 py-1.5 rounded-md bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-sm font-medium transition-colors cursor-pointer"
+            class="self-center mt-6 px-8 py-1.5 rounded-md bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-sm font-medium transition-colors cursor-pointer"
           >
             Get started
           </button>
@@ -307,3 +328,26 @@
     </button>
   {/if}
 </div>
+
+<style>
+  .onboard-check {
+    width: 112px;
+    height: 112px;
+    margin-bottom: -14px;
+  }
+
+  .onboard-check path {
+    fill: none;
+    stroke: #4572e3;
+    stroke-width: 3.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+    animation: draw-check 0.35s ease-out 0.62s forwards;
+  }
+
+  @keyframes draw-check {
+    to { stroke-dashoffset: 0; }
+  }
+</style>
