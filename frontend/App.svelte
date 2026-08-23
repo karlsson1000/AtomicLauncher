@@ -41,6 +41,15 @@
     return () => window.removeEventListener("keydown", handleGlobalKeydown)
   })
 
+  $effect(() => {
+    const theme = store.settings?.theme || "octane"
+    const root = document.documentElement
+    for (const cls of Array.from(root.classList)) {
+      if (cls.startsWith("theme-")) root.classList.remove(cls)
+    }
+    root.classList.add(`theme-${theme}`)
+  })
+
   onMount(() => {
     setTimeout(async () => {
       store.isReady = true
