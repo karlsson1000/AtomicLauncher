@@ -14,7 +14,7 @@
   import { storeGet, storeSet } from "../../lib/store"
   import { showToast } from "../../lib/toastStore.svelte"
 
-  async function handleSetDefaultOptions(name: string) {
+  async function handleSaveOptionsAsDefault(name: string) {
     try {
       await invoke("save_options_as_default", { instanceName: name })
       showToast("success", "Options saved", 5000)
@@ -23,7 +23,7 @@
     }
   }
 
-  async function handleResetOptions(name: string) {
+  async function handleApplySavedOptions(name: string) {
     try {
       await invoke("apply_saved_options", { instanceName: name })
       showToast("success", "Saved options applied", 4000)
@@ -226,8 +226,8 @@
       { label: "Duplicate", icon: Copy, onClick: () => handleDuplicateInstance(cm.instance) },
       { label: "Export", icon: FileArchive, onClick: () => { setExportModal(cm.instance); contextMenu = null } },
       { separator: true },
-      { label: "Save Options as Default", icon: Save, onClick: () => { handleSetDefaultOptions(cm.instance.name); contextMenu = null } },
-      { label: "Apply Saved Options", icon: ClipboardCheck, onClick: () => { handleResetOptions(cm.instance.name); contextMenu = null } },
+      { label: "Save Options as Default", icon: Save, onClick: () => { handleSaveOptionsAsDefault(cm.instance.name); contextMenu = null } },
+      { label: "Apply Saved Options", icon: ClipboardCheck, onClick: () => { handleApplySavedOptions(cm.instance.name); contextMenu = null } },
       { separator: true },
       { label: "Add to group", icon: FolderPlus, onClick: () => { groupModalInstance = cm.instance; groupModalValue = ""; showGroupModal = true; contextMenu = null } },
     ]
