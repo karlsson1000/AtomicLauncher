@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core"
-  import { Loader2, Coffee, Cpu, ImagePlus, FolderOpen, X, Check, ChevronDown, Info, Terminal, Paintbrush, Play, Sparkles } from "lucide-svelte"
+  import { Loader2, ImagePlus, FolderOpen, X, Check, ChevronDown, Paintbrush, Play, AppWindow, HardDrive } from "lucide-svelte"
   import AlertModal from "../../components/ui/AlertModal.svelte"
   import TrashSection from "./TrashSection.svelte"
   import { store, setSettings, loadBackground, setShowOnboarding } from "../../lib/launcherStore.svelte"
@@ -8,11 +8,30 @@
   import type { LauncherSettings } from "../../types"
 
   const THEMES = [
-    { id: "octane", label: "Octane", colors: ["#1a1d23", "#252932", "#4572e3", "#e6e6e6"] },
-    { id: "light", label: "Light", colors: ["#ffffff", "#f0f0f0", "#4361ee", "#1a1d23"] },
-    { id: "rose", label: "Rosé", colors: ["#1a1423", "#2a1a33", "#f472b6", "#e6e6e6"] },
-    { id: "cherry", label: "Cherry", colors: ["#1a0d0f", "#2a1417", "#dc2626", "#e6e6e6"] },
+    { id: "octane", label: "Octane", colors: ["#15171c", "#252932", "#4572e3", "#e6e6e6"] },
+    { id: "light", label: "Light", colors: ["#f5f5f5", "#ffffff", "#4361ee", "#1a1d23"] },
+    { id: "rose", label: "Rosé", colors: ["#1a1423", "#2a1a33", "#f472b6", "#e6e6ee"] },
+    { id: "cherry", label: "Cherry", colors: ["#1a0d0f", "#2a1417", "#dc2626", "#f4ecec"] },
   ] as const
+
+  type TabId = "appearance" | "game" | "launcher" | "storage"
+
+  const TABS: Array<{ id: TabId; label: string; icon: typeof Paintbrush }> = [
+    { id: "appearance", label: "Appearance", icon: Paintbrush },
+    { id: "game", label: "Game", icon: Play },
+    { id: "launcher", label: "Launcher", icon: AppWindow },
+    { id: "storage", label: "Storage", icon: HardDrive },
+  ]
+
+  const SECTION_TAB: Record<string, TabId> = {
+    memory: "game",
+    console: "launcher",
+    java: "game",
+    appearance: "appearance",
+    background: "appearance",
+    directory: "storage",
+    storage: "storage",
+  }
 
   let { isOpen, onClose }: { isOpen: boolean; onClose: () => void } = $props()
 
@@ -27,6 +46,7 @@
     size_bytes: number
   }
 
+  let activeTab = $state<TabId>("appearance")
   let javaInstallations: string[] = $state([])
   let isLoadingJava = $state(false)
   let showCustomPath = $state(false)
@@ -47,10 +67,51 @@
   let isClosing = $state(false)
   let isJavaDropdownOpen = $state(false)
   let javaDropdownEl: HTMLDivElement | undefined = $state()
+  let javaDropdownUp = $state(false)
+  let javaDropdownMaxH = $state(240)
+
+  function toggleJavaDropdown() {
+    if (isJavaDropdownOpen) {
+      isJavaDropdownOpen = false
+      return
+    }
+    const el = javaDropdownEl
+    const scroller = el?.closest(".overflow-y-auto")
+    if (el && scroller) {
+      const trig = el.getBoundingClientRect()
+      const sc = scroller.getBoundingClientRect()
+      const spaceBelow = sc.bottom - trig.bottom - 8
+      const spaceAbove = trig.top - sc.top - 8
+      javaDropdownUp = spaceAbove > spaceBelow
+      javaDropdownMaxH = Math.min(240, Math.max(javaDropdownUp ? spaceAbove : spaceBelow, 96))
+    }
+    isJavaDropdownOpen = true
+  }
   let isTabDropdownOpen = $state(false)
   let tabDropdownEl: HTMLDivElement | undefined = $state()
   let saveTimeout: ReturnType<typeof setTimeout> | undefined
   let ramSliderValue = $state(store.settings?.memory_mb ?? 4096)
+  let ramTextValue = $state(((store.settings?.memory_mb ?? 4096) / 1024).toFixed(1))
+  let ramTextFocused = $state(false)
+
+  $effect(() => {
+    if (!ramTextFocused) ramTextValue = (ramSliderValue / 1024).toFixed(1)
+  })
+
+  function commitRamText() {
+    ramTextFocused = false
+    const parsed = parseFloat(ramTextValue.replace(",", "."))
+    if (isNaN(parsed)) {
+      ramTextValue = (ramSliderValue / 1024).toFixed(1)
+      return
+    }
+    const maxMb = (systemInfo as SystemInfo | null)?.total_memory_mb || 32768
+    const mb = Math.min(maxMb, Math.max(1024, Math.round((parsed * 1024) / 512) * 512))
+    ramTextValue = (mb / 1024).toFixed(1)
+    if (mb === ramSliderValue) return
+    ramSliderValue = mb
+    handleSettingChangeDebounced({ ...store.settings!, memory_mb: mb } as LauncherSettings)
+  }
 
   let ramPercent = $derived(store.settings ? ((ramSliderValue - 1024) / (((systemInfo as SystemInfo | null)?.total_memory_mb || 32768) - 1024)) * 100 : 0)
   let totalBytes = $derived(storageCategories.reduce((sum, c) => sum + c.size_bytes, 0))
@@ -73,12 +134,13 @@
 
       const target = store.settingsScrollTarget
       if (target) {
+        activeTab = SECTION_TAB[target] ?? "appearance"
+        store.settingsScrollTarget = null
         setTimeout(() => {
           document
             .getElementById(`settings-${target}`)
-            ?.scrollIntoView({ behavior: "smooth", block: "start" })
-        }, 60)
-        store.settingsScrollTarget = null
+            ?.scrollIntoView({ behavior: "smooth", block: "center" })
+        }, 80)
       }
     }
 
@@ -258,8 +320,8 @@
 {#if isOpen}
   {#if !store.settings}
     <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div class="bg-[var(--bg-primary)] rounded p-8">
-        <div class="flex items-center gap-2 text-[var(--text-muted)] text-base">
+      <div class="bg-[var(--bg-primary)] rounded-lg p-8">
+        <div class="flex items-center gap-2 text-[var(--text-muted)]">
           <Loader2 size={20} class="animate-spin" />
           <span>Loading settings...</span>
         </div>
@@ -267,7 +329,7 @@
     </div>
   {:else}
     <div
-      class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 modal-backdrop"
+      class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-6 modal-backdrop"
       class:closing={isClosing}
       role="presentation"
       onclick={handleClose}
@@ -275,322 +337,306 @@
     >
       <div
         role="presentation"
-        class="blur-border bg-[var(--bg-primary)] rounded w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl modal-content"
+        class="blur-border bg-[var(--bg-primary)] rounded-lg w-full max-w-5xl h-full max-h-[74vh] flex flex-col modal-content overflow-hidden"
         class:closing={isClosing}
         onclick={(e) => e.stopPropagation()}
       >
-        <div class="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[var(--border-default)]">
+        <div class="flex items-center justify-between pl-7 pr-9 pt-5 pb-1">
           <h2 class="text-lg font-semibold text-[var(--text-primary)]">Settings</h2>
           <div class="flex items-center gap-3">
             {#if appVersion}
-              <span class="bg-[var(--bg-elevated)] px-2.5 py-1 rounded text-xs text-[var(--text-muted)]">
-                Build {appVersion.split('-')[1] || appVersion}
-              </span>
+              <span class="text-xs text-[var(--text-muted)] font-mono px-2 py-1 rounded-md bg-[var(--bg-elevated)]">{appVersion.split('-')[1] || appVersion}</span>
             {/if}
-            <button onclick={handleClose} class="p-1.5 hover:bg-[var(--bg-hover)] rounded transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">
+            <button onclick={handleClose} class="p-1.5 hover:bg-[var(--bg-hover)] rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">
               <X size={18} />
             </button>
           </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-5 space-y-6">
-          <!-- Memory -->
-          <div id="settings-memory" class="space-y-2">
-            <div class="flex items-center gap-2 text-[var(--text-primary)]">
-              <Cpu size={16} class="text-[var(--accent-primary)]" />
-              <span class="font-medium text-sm">Memory Allocation</span>
-            </div>
-            <div class="bg-[var(--bg-elevated)] rounded p-3 space-y-2">
-              <div class="flex items-baseline justify-between">
-                <span class="text-xl font-bold text-[var(--text-primary)]">{(ramSliderValue / 1024).toFixed(1)} GB</span>
-                <span class="text-xs text-[var(--text-muted)]">of {systemInfo ? (systemInfo.total_memory_mb / 1024).toFixed(0) : '16'} GB total</span>
-              </div>
-              <div class="relative h-6 flex items-center">
-                <div class="absolute inset-x-0 h-2 bg-[var(--bg-primary)] rounded-full"></div>
-                <div class="absolute h-2 rounded-full" style="width: {ramPercent}%; background: var(--accent-primary)"></div>
-                <div class="absolute w-4 h-4 rounded-full bg-[var(--accent-primary)] -translate-x-1/2 shadow-md" style="left: {ramPercent}%"></div>
-                <input
-                  type="range" min="1024" max={systemInfo?.total_memory_mb || 32768} step="512"
-                  bind:value={ramSliderValue}
-                  oninput={() => handleSettingChangeDebounced({ ...store.settings!, memory_mb: ramSliderValue } as LauncherSettings)}
-                  class="absolute inset-0 w-full opacity-0 cursor-pointer"
-                />
-              </div>
-              {#if systemInfo}
-                <div class="flex justify-between text-xs">
-                  <span class="text-[var(--text-muted)]">Available</span>
-                  <span class="text-[var(--text-primary)] font-medium">{(systemInfo.available_memory_mb / 1024).toFixed(1)} GB</span>
-                </div>
-              {/if}
-            </div>
-          </div>
-
-          <!-- Java -->
-          <div id="settings-java" class="space-y-2 min-w-0">
-            <div class="flex items-center gap-2 text-[var(--text-primary)]">
-              <Coffee size={16} class="text-[var(--accent-primary)]" />
-              <span class="font-medium text-sm">Java Runtime</span>
-            </div>
-            <div class="flex gap-2 min-w-0">
-              <div class="relative flex-1 min-w-0" bind:this={javaDropdownEl}>
-                <button
-                  onclick={() => isJavaDropdownOpen = !isJavaDropdownOpen}
-                  class="w-full bg-[var(--bg-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] text-left flex items-center justify-between cursor-pointer min-w-0 rounded"
-                >
-                  <span class="truncate">
-                    {showCustomPath ? "Custom Path..." : (store.settings.java_path || "Auto-detect (Recommended)")}
-                  </span>
-                  <ChevronDown size={14} class="flex-shrink-0 ml-2 transition-transform {isJavaDropdownOpen ? 'rotate-180' : ''}" />
-                </button>
-
-                {#if isJavaDropdownOpen}
-                  <div class="absolute z-[60] w-full bg-[var(--bg-elevated)] rounded shadow-lg max-h-60 overflow-y-auto mt-1">
-                    <button
-                      onclick={() => { showCustomPath = false; customPathValue = ""; handleSettingChange({ ...store.settings!, java_path: null } as LauncherSettings); isJavaDropdownOpen = false }}
-                      class="w-full px-3 py-2 text-sm text-left hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-between cursor-pointer"
-                    >
-                      <span>Auto-detect (Recommended)</span>
-                      {#if !store.settings.java_path && !showCustomPath}<Check size={14} class="text-[var(--text-primary)]" />{/if}
-                    </button>
-                    {#each javaInstallations as path (path)}
-                      <button
-                        onclick={() => { showCustomPath = false; customPathValue = ""; handleSettingChange({ ...store.settings!, java_path: path } as LauncherSettings); isJavaDropdownOpen = false }}
-                        class="w-full px-3 py-2 text-sm text-left hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-between cursor-pointer"
-                      >
-                        <span class="truncate">{path}</span>
-                        {#if store.settings.java_path === path && !showCustomPath}<Check size={14} class="text-[var(--text-primary)] flex-shrink-0 ml-2" />{/if}
-                      </button>
-                    {/each}
-                    <button
-                      onclick={() => { showCustomPath = true; customPathValue = store.settings?.java_path || ""; isJavaDropdownOpen = false }}
-                      class="w-full px-3 py-2 text-sm text-left hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-between cursor-pointer"
-                    >
-                      <span>Custom Path...</span>
-                      {#if showCustomPath}<Check size={14} class="text-[var(--text-primary)]" />{/if}
-                    </button>
-                  </div>
-                {/if}
-              </div>
-
-              <button onclick={loadJavaInstallations} disabled={isLoadingJava} class="px-3 py-2 bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] disabled:opacity-50 rounded text-sm font-medium text-[var(--text-primary)] cursor-pointer disabled:cursor-not-allowed">
-                {#if isLoadingJava}<Loader2 size={14} class="animate-spin" />{:else}Scan{/if}
-              </button>
-            </div>
-
-            {#if showCustomPath}
-              <input
-                type="text"
-                class="w-full bg-[var(--bg-elevated)] rounded px-3 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] font-mono min-w-0"
-                placeholder="C:\\Program Files\\Java\\jdk-21\\bin\\javaw.exe"
-                bind:value={customPathValue}
-                onblur={() => { if (customPathValue.trim()) handleSettingChange({ ...store.settings!, java_path: customPathValue.trim() } as LauncherSettings) }}
-                onkeydown={(e) => { if (e.key === 'Enter' && customPathValue.trim()) { handleSettingChange({ ...store.settings!, java_path: customPathValue.trim() } as LauncherSettings); (e.currentTarget as HTMLInputElement).blur() } }}
-              />
-            {/if}
-          </div>
-
-          <!-- Appearance -->
-          <div id="settings-appearance" class="space-y-2">
-            <div class="flex items-center gap-2 text-[var(--text-primary)]">
-              <Paintbrush size={16} class="text-[var(--accent-primary)]" />
-              <span class="font-medium text-sm">Theme</span>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-              {#each THEMES as theme}
-                <button
-                  onclick={() => store.settings && handleSettingChange({ ...store.settings, theme: theme.id })}
-                  class="flex items-center justify-between gap-2 p-2.5 rounded transition-all cursor-pointer {store.settings?.theme === theme.id ? 'bg-[var(--accent-primary)]/10 ring-1 ring-[var(--accent-primary)]' : 'bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)]'}"
-                >
-                  <span class="text-sm font-medium text-[var(--text-primary)]">{theme.label}</span>
-                  <div class="flex items-center gap-1">
-                    {#each theme.colors as color}
-                      <div class="w-3.5 h-3.5 rounded-full border border-white/10" style="background-color: {color}"></div>
-                    {/each}
-                  </div>
-                </button>
-              {/each}
-            </div>
-          </div>
-
-          <!-- Background -->
-          <div id="settings-background" class="space-y-2">
-            <div class="flex items-center gap-2 text-[var(--text-primary)]">
-              <ImagePlus size={16} class="text-[var(--accent-primary)]" />
-              <span class="font-medium text-sm">Background</span>
-            </div>
-            {#if sidebarBgPreview}
-              <div class="relative group">
-                <div class="h-32 rounded overflow-hidden bg-[var(--bg-elevated)]">
-                  <img src={sidebarBgPreview} alt="Background" class="w-full h-full object-cover" />
-                </div>
-                <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center gap-2">
-                  <button onclick={() => fileInputEl?.click()} class="px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white rounded text-sm font-medium cursor-pointer">Change</button>
-                  <button onclick={handleRemoveBackground} class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-sm font-medium cursor-pointer">Remove</button>
-                </div>
-              </div>
-            {:else}
-              <button onclick={() => fileInputEl?.click()} class="w-full h-24 bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border-2 border-dashed border-[var(--border-default)] hover:border-[var(--accent-primary)] rounded transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer">
-                <ImagePlus size={24} class="text-[var(--text-muted)]" />
-                <span class="text-xs text-[var(--text-muted)]">Click to upload image</span>
-                <span class="text-[10px] text-[var(--text-muted)]">PNG, JPG up to 10MB</span>
-              </button>
-            {/if}
-            <input bind:this={fileInputEl} type="file" accept="image/*" onchange={handleFileSelect} class="hidden" />
-          </div>
-
-          <!-- Startup -->
-          <div class="space-y-2">
-            <div class="flex items-center gap-2 text-[var(--text-primary)]">
-              <Play size={16} class="text-[var(--accent-primary)]" />
-              <span class="font-medium text-sm">Startup</span>
-            </div>
-            <div class="flex items-center justify-between bg-[var(--bg-elevated)] rounded p-3">
-              <div>
-                <span class="text-sm font-medium text-[var(--text-primary)]">Default Tab</span>
-                <p class="text-xs text-[var(--text-muted)]">Tab shown when the launcher opens</p>
-              </div>
-              <div class="relative" bind:this={tabDropdownEl}>
-                <button
-                  onclick={() => isTabDropdownOpen = !isTabDropdownOpen}
-                  class="bg-[var(--bg-hover)] px-3 py-1.5 text-sm text-[var(--text-primary)] rounded flex items-center gap-2 cursor-pointer capitalize"
-                >
-                  {store.settings.default_tab || "home"}
-                  <ChevronDown size={14} class="transition-transform {isTabDropdownOpen ? 'rotate-180' : ''}" />
-                </button>
-                {#if isTabDropdownOpen}
-                  <div class="absolute right-0 z-[60] w-36 bg-[var(--bg-elevated)] rounded shadow-lg overflow-hidden mt-1">
-                    {#each ["home", "instances", "addons", "servers", "skins", "screenshots"] as tab}
-                      <button
-                        onclick={() => { handleSettingChange({ ...store.settings!, default_tab: tab } as LauncherSettings); isTabDropdownOpen = false }}
-                        class="w-full px-3 py-2 text-sm text-left hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-between cursor-pointer capitalize"
-                      >
-                        {tab}
-                        {#if (store.settings.default_tab || "home") === tab}<Check size={14} class="text-[var(--text-primary)]" />{/if}
-                      </button>
-                    {/each}
-                  </div>
-                {/if}
-              </div>
-            </div>
-          </div>
-
-          <!-- Console -->
-          <div id="settings-console" class="space-y-2">
-            <div class="flex items-center gap-2 text-[var(--text-primary)]">
-              <Terminal size={16} class="text-[var(--accent-primary)]" />
-              <span class="font-medium text-sm">Console</span>
-            </div>
-            <div class="flex items-center justify-between bg-[var(--bg-elevated)] rounded p-3">
-              <div>
-                <span class="text-sm font-medium text-[var(--text-primary)]">Auto-Navigate to Console</span>
-                <p class="text-xs text-[var(--text-muted)]">
-                  {(store.settings.auto_navigate_to_console ?? true) ? "Switch to Console tab when launching" : "Stay on current tab when launching"}
-                </p>
-              </div>
+        <div class="flex flex-1 min-h-0 gap-4 px-7 pb-7 pt-4">
+          <nav class="w-40 flex-shrink-0 flex flex-col gap-y-1">
+            {#each TABS as tab (tab.id)}
               <button
-                onclick={() => handleSettingChange({ ...store.settings!, auto_navigate_to_console: !(store.settings?.auto_navigate_to_console ?? true) } as LauncherSettings)}
-                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer flex-shrink-0 ml-3 {(store.settings.auto_navigate_to_console ?? true) ? 'bg-[var(--accent-primary)]' : 'bg-[var(--bg-hover)]'}"
-                aria-label="Toggle auto-navigate to console"
+                onclick={() => { activeTab = tab.id }}
+                class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-left text-sm font-medium transition-colors cursor-pointer {activeTab === tab.id
+                  ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}"
               >
-                <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {(store.settings.auto_navigate_to_console ?? true) ? 'translate-x-6' : 'translate-x-1'}"></span>
+                <tab.icon size={16} strokeWidth={2} class={"flex-shrink-0 " + (activeTab === tab.id ? "text-[var(--accent-primary)]" : "")} />
+                <span>{tab.label}</span>
               </button>
-            </div>
-          </div>
+            {/each}
 
-          <!-- Game Directory -->
-          <div id="settings-directory" class="space-y-2">
-            <div class="flex items-center gap-2 text-[var(--text-primary)]">
-              <FolderOpen size={16} class="text-[var(--accent-primary)]" />
-              <span class="font-medium text-sm">Game Directory</span>
+            <div class="mt-auto px-4 pt-4">
+              <p class="text-xs leading-relaxed text-[var(--text-muted)]">
+                Octane Launcher<br />v{semanticVersion || "…"}
+              </p>
             </div>
-            <div class="bg-[var(--bg-elevated)] rounded p-3 flex items-center justify-between gap-3">
-              <p class="text-xs text-[var(--text-muted)] font-mono break-all flex-1">{store.launcherDirectory || "Loading..."}</p>
-              <button
-                onclick={() => handleOpenDirectory(store.launcherDirectory)}
-                disabled={!store.launcherDirectory}
-                class="flex-shrink-0 px-2.5 py-1.5 bg-[var(--bg-hover)] hover:bg-[var(--bg-hover)] disabled:opacity-50 rounded text-xs font-medium text-[var(--text-primary)] cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors"
-              >
-                <FolderOpen size={12} />
-                Open
-              </button>
-            </div>
-          </div>
+          </nav>
 
-          <!-- Storage Overview -->
-          <div id="settings-storage" class="space-y-2">
-            <div class="flex items-center justify-between text-[var(--text-primary)]">
-              <div class="flex items-center gap-2">
-                <FolderOpen size={16} class="text-[var(--accent-primary)]" />
-                <span class="font-medium text-sm">Storage Overview</span>
-              </div>
-              {#if storageCategories.length > 0}
-                <span class="text-xs text-[var(--text-muted)]">{formatBytes(totalBytes)}</span>
-              {/if}
-            </div>
-            <div class="bg-[var(--bg-elevated)] rounded p-3 space-y-3">
-              {#if storageLoading}
-                <div class="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                  <Loader2 size={14} class="animate-spin" />
-                  <span>Calculating storage usage...</span>
-                </div>
-              {:else if storageCategories.length === 0}
-                <div class="text-xs text-[var(--text-muted)]">No data</div>
-              {:else}
-                <div class="h-2 rounded-full overflow-hidden flex bg-[var(--bg-primary)]">
-                  {#each storageCategories as cat (cat.name)}
-                    <div
-                      style="width: {(cat.size_bytes / totalBytes) * 100}%; background-color: {storageColors[cat.name] || '#6b7280'}"
-                      class="h-full first:rounded-l-full last:rounded-r-full"
-                    ></div>
+          <div class="flex-1 min-w-0 overflow-y-auto pr-2 space-y-6">
+            {#if activeTab === "appearance"}
+              <section class="bg-[var(--bg-elevated)] rounded-lg p-4">
+                <h4 class="text-base font-semibold text-[var(--text-primary)] mb-1">Theme</h4>
+                <p class="text-xs text-[var(--text-muted)] mb-5">Pick the color scheme for the whole launcher.</p>
+                <div class="grid grid-cols-4 gap-4">
+                  {#each THEMES as theme (theme.id)}
+                    <button
+                      onclick={() => store.settings && handleSettingChange({ ...store.settings, theme: theme.id })}
+                      class="group rounded-lg overflow-hidden text-left cursor-pointer transition-all relative {store.settings?.theme === theme.id
+                        ? 'ring-2 ring-[var(--accent-primary)]'
+                        : 'hover:brightness-110'}"
+                    >
+                      <div class="flex h-20" style="background: {theme.colors[0]}">
+                        <div class="w-7 h-full flex flex-col gap-1.5 p-1.5" style="background: {theme.colors[1]}">
+                          <div class="w-full h-2 rounded-sm" style="background: {theme.colors[2]}"></div>
+                          <div class="w-full h-2 rounded-sm opacity-30" style="background: {theme.colors[3]}"></div>
+                          <div class="w-full h-2 rounded-sm opacity-30" style="background: {theme.colors[3]}"></div>
+                        </div>
+                        <div class="flex-1 p-2.5 space-y-1.5">
+                          <div class="h-2 w-14 rounded-sm" style="background: {theme.colors[3]}"></div>
+                          <div class="h-2 w-20 rounded-sm opacity-30" style="background: {theme.colors[3]}"></div>
+                          <div class="h-8 w-full rounded-md mt-2 opacity-15" style="background: {theme.colors[1]}"></div>
+                        </div>
+                      </div>
+                      <div class="flex items-center justify-between px-3.5 py-2.5" style="background: {theme.colors[1]}">
+                        <span class="text-xs font-semibold" style="color: {theme.colors[3]}">{theme.label}</span>
+                        <div class="w-3.5 h-3.5 rounded-full flex items-center justify-center" style="background: {theme.colors[2]}">
+                          {#if store.settings?.theme === theme.id}<Check size={10} class="text-white" strokeWidth={3} />{/if}
+                        </div>
+                      </div>
+                    </button>
                   {/each}
                 </div>
-                <div class="flex flex-wrap gap-x-4 gap-y-1">
-                  {#each storageCategories as cat (cat.name)}
-                    <div class="flex items-center gap-1.5 text-xs">
-                      <div class="w-2.5 h-2.5 rounded-sm" style="background-color: {storageColors[cat.name] || '#6b7280'}"></div>
-                      <span class="text-[var(--text-muted)]">{cat.name}</span>
-                      <span class="text-[var(--text-primary)] font-medium">{formatBytes(cat.size_bytes)}</span>
+              </section>
+
+              <section id="settings-background" class="bg-[var(--bg-elevated)] rounded-lg p-4">
+                <h4 class="text-base font-semibold text-[var(--text-primary)] mb-4">Custom background</h4>
+                {#if sidebarBgPreview}
+                  <div class="relative group">
+                    <div class="h-40 rounded-lg overflow-hidden bg-[var(--bg-primary)]">
+                      <img src={sidebarBgPreview} alt="Background" class="w-full h-full object-cover" />
                     </div>
-                  {/each}
+                    <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                      <button onclick={() => fileInputEl?.click()} class="px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-xs font-medium cursor-pointer">Change</button>
+                      <button onclick={handleRemoveBackground} class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium cursor-pointer">Remove</button>
+                    </div>
+                  </div>
+                {:else}
+                  <button onclick={() => fileInputEl?.click()} class="w-full h-28 bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] rounded-lg transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer">
+                    <ImagePlus size={22} class="text-[var(--text-muted)]" />
+                    <span class="text-xs text-[var(--text-muted)]">Click to upload an image · PNG, JPG up to 10MB</span>
+                  </button>
+                {/if}
+                <input bind:this={fileInputEl} type="file" accept="image/*" onchange={handleFileSelect} class="hidden" />
+              </section>
+            {:else if activeTab === "game"}
+              <section id="settings-memory" class="bg-[var(--bg-elevated)] rounded-lg p-4">
+                <div class="flex items-center justify-between mb-4">
+                  <div>
+                    <h4 class="text-base font-semibold text-[var(--text-primary)]">Memory allocation</h4>
+                    <p class="text-xs text-[var(--text-muted)] mt-0.5">
+                      {systemInfo ? `${(systemInfo.available_memory_mb / 1024).toFixed(1)} GB` : "?"} currently available on your system
+                    </p>
+                  </div>
+                  <div class="flex items-baseline">
+                    <input
+                      type="text"
+                      inputmode="decimal"
+                      aria-label="Memory allocation in GB"
+                      bind:value={ramTextValue}
+                      onfocus={() => ramTextFocused = true}
+                      onblur={commitRamText}
+                      onkeydown={(e) => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur() }}
+                      class="w-[4ch] rounded-md px-1 -mx-1 text-3xl font-bold text-[var(--text-primary)] font-mono text-right cursor-text bg-[var(--bg-primary)] hover:brightness-125 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                    />
+                    <span class="text-sm text-[var(--text-muted)] font-sans font-normal ml-1">GB</span>
+                  </div>
                 </div>
-              {/if}
-            </div>
-          </div>
+                <div class="relative h-6 flex items-center">
+                  <div class="absolute inset-x-0 h-2 bg-[var(--bg-primary)] rounded-full"></div>
+                  <div class="absolute h-2 rounded-full" style="width: {ramPercent}%; background: var(--accent-primary)"></div>
+                  <div class="absolute w-4 h-4 rounded-full bg-white border-2 border-[var(--accent-primary)] -translate-x-1/2" style="left: {ramPercent}%"></div>
+                  <input
+                    type="range" min="1024" max={systemInfo?.total_memory_mb || 32768} step="512"
+                    bind:value={ramSliderValue}
+                    oninput={() => handleSettingChangeDebounced({ ...store.settings!, memory_mb: ramSliderValue } as LauncherSettings)}
+                    class="absolute inset-0 w-full opacity-0 cursor-pointer"
+                  />
+                </div>
+              </section>
 
-          <!-- Trash -->
-          <TrashSection onAlert={(alert) => alertModal = alert} />
+              <section id="settings-java" class="bg-[var(--bg-elevated)] rounded-lg p-4">
+                <div class="flex items-start justify-between gap-6 mb-4">
+                  <div class="min-w-0">
+                    <h4 class="text-base font-semibold text-[var(--text-primary)]">Java runtime</h4>
+                    <p class="text-xs text-[var(--text-muted)] mt-0.5">Which runtime Minecraft runs on.</p>
+                  </div>
+                  <button onclick={loadJavaInstallations} disabled={isLoadingJava} class="flex-shrink-0 px-4 py-2 text-sm font-medium rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5">
+                    {#if isLoadingJava}<Loader2 size={14} class="animate-spin" />{/if}
+                    Rescan
+                  </button>
+                </div>
 
-          <!-- Onboarding -->
-          <div class="space-y-2">
-            <div class="flex items-center gap-2 text-[var(--text-primary)]">
-              <Sparkles size={16} class="text-[var(--accent-primary)]" />
-              <span class="font-medium text-sm">Onboarding</span>
-            </div>
-            <div class="bg-[var(--bg-elevated)] rounded p-3 flex items-center justify-between gap-3">
-              <span class="text-xs text-[var(--text-muted)] leading-relaxed">
-                Revisit the first-time setup, import instances from other launchers.
-              </span>
-              <button
-                onclick={() => { onClose(); setShowOnboarding(true) }}
-                class="flex-shrink-0 px-2.5 py-1.5 bg-[var(--bg-hover)] hover:bg-[var(--bg-hover)] rounded text-xs font-medium text-[var(--text-primary)] cursor-pointer transition-colors"
-              >
-                Show onboarding
-              </button>
-            </div>
-          </div>
+                <div class="relative" bind:this={javaDropdownEl}>
+                  <button
+                    onclick={toggleJavaDropdown}
+                    class="w-full bg-[var(--bg-primary)] px-4 py-2 text-sm text-[var(--text-primary)] text-left flex items-center justify-between cursor-pointer min-w-0 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+                  >
+                    <span class="truncate">
+                      {showCustomPath ? "Custom Path..." : (store.settings.java_path || "Auto-detect (Recommended)")}
+                    </span>
+                    <ChevronDown size={14} class="flex-shrink-0 ml-2 transition-transform {isJavaDropdownOpen ? 'rotate-180' : ''}" />
+                  </button>
 
-          <!-- Version Information -->
-          <div class="space-y-2">
-            <div class="flex items-center gap-2 text-[var(--text-primary)]">
-              <Info size={16} class="text-[var(--accent-primary)]" />
-              <span class="font-medium text-sm">Version Information</span>
-            </div>
-            <div class="bg-[var(--bg-elevated)] rounded p-3 space-y-2">
-              <div class="flex justify-between text-sm">
-                <span class="text-[var(--text-muted)]">Launcher Version</span>
-                <span class="text-[var(--text-primary)] font-medium">{semanticVersion || "Loading..."}</span>
-              </div>
-            </div>
+                  {#if isJavaDropdownOpen}
+                    <div class="absolute z-[60] w-full bg-[var(--bg-secondary)] rounded-lg overflow-y-auto custom-scrollbar {javaDropdownUp ? 'bottom-full mb-2' : 'mt-2'}" style="max-height: {javaDropdownMaxH}px">
+                      <button
+                        onclick={() => { showCustomPath = false; customPathValue = ""; handleSettingChange({ ...store.settings!, java_path: null } as LauncherSettings); isJavaDropdownOpen = false }}
+                        class="w-full px-4 py-2 text-sm text-left hover:bg-[var(--bg-hover)] text-[var(--text-primary)] first:rounded-t-xl last:rounded-b-xl flex items-center justify-between cursor-pointer"
+                      >
+                        <span>Auto-detect (Recommended)</span>
+                        {#if !store.settings.java_path && !showCustomPath}<Check size={14} class="text-[var(--accent-primary)]" />{/if}
+                      </button>
+                      {#each javaInstallations as path (path)}
+                        <button
+                          onclick={() => { showCustomPath = false; customPathValue = ""; handleSettingChange({ ...store.settings!, java_path: path } as LauncherSettings); isJavaDropdownOpen = false }}
+                          class="w-full px-4 py-2 text-sm text-left hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-between cursor-pointer"
+                        >
+                          <span class="truncate">{path}</span>
+                          {#if store.settings.java_path === path && !showCustomPath}<Check size={14} class="text-[var(--accent-primary)] flex-shrink-0 ml-2" />{/if}
+                        </button>
+                      {/each}
+                      <button
+                        onclick={() => { showCustomPath = true; customPathValue = store.settings?.java_path || ""; isJavaDropdownOpen = false }}
+                        class="w-full px-4 py-2 text-sm text-left hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-between cursor-pointer"
+                      >
+                        <span>Custom Path...</span>
+                        {#if showCustomPath}<Check size={14} class="text-[var(--accent-primary)]" />{/if}
+                      </button>
+                    </div>
+                  {/if}
+                </div>
+
+                {#if showCustomPath}
+                  <input
+                    type="text"
+                    class="w-full bg-[var(--bg-primary)] rounded-lg px-4 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] font-mono min-w-0 mt-2"
+                    placeholder="C:\\Program Files\\Java\\jdk-21\\bin\\javaw.exe"
+                    bind:value={customPathValue}
+                    onblur={() => { if (customPathValue.trim()) handleSettingChange({ ...store.settings!, java_path: customPathValue.trim() } as LauncherSettings) }}
+                    onkeydown={(e) => { if (e.key === 'Enter' && customPathValue.trim()) { handleSettingChange({ ...store.settings!, java_path: customPathValue.trim() } as LauncherSettings); (e.currentTarget as HTMLInputElement).blur() } }}
+                  />
+                {/if}
+              </section>
+            {:else if activeTab === "launcher"}
+              <section class="bg-[var(--bg-elevated)] rounded-lg p-4 flex items-center justify-between gap-8">
+                <div class="min-w-0">
+                  <h4 class="text-base font-semibold text-[var(--text-primary)]">Default tab</h4>
+                  <p class="text-xs text-[var(--text-muted)] mt-0.5">The tab shown when the launcher opens.</p>
+                </div>
+                <div class="relative flex-shrink-0" bind:this={tabDropdownEl}>
+                  <button
+                    onclick={() => isTabDropdownOpen = !isTabDropdownOpen}
+                    class="bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] px-4 py-2 text-sm text-[var(--text-primary)] rounded-lg flex items-center gap-2 cursor-pointer capitalize transition-colors min-w-[140px] justify-between"
+                  >
+                    {store.settings.default_tab || "home"}
+                    <ChevronDown size={14} class="transition-transform {isTabDropdownOpen ? 'rotate-180' : ''}" />
+                  </button>
+                  {#if isTabDropdownOpen}
+                    <div class="absolute right-0 z-[60] w-full min-w-[160px] bg-[var(--bg-secondary)] rounded-lg overflow-hidden mt-2">
+                      {#each ["home", "instances", "addons", "servers", "skins", "screenshots"] as tab (tab)}
+                        <button
+                          onclick={() => { handleSettingChange({ ...store.settings!, default_tab: tab } as LauncherSettings); isTabDropdownOpen = false }}
+                          class="w-full px-4 py-2 text-sm text-left hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-between cursor-pointer capitalize"
+                        >
+                          {tab}
+                          {#if (store.settings.default_tab || "home") === tab}<Check size={14} class="text-[var(--accent-primary)]" />{/if}
+                        </button>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+              </section>
+
+              <section id="settings-console" class="bg-[var(--bg-elevated)] rounded-lg p-4 flex items-center justify-between gap-8">
+                <div class="min-w-0">
+                  <h4 class="text-base font-semibold text-[var(--text-primary)]">Auto-navigate to console</h4>
+                  <p class="text-xs text-[var(--text-muted)] mt-0.5">Switch to the Console tab when a game launches</p>
+                </div>
+                <button
+                  onclick={() => handleSettingChange({ ...store.settings!, auto_navigate_to_console: !(store.settings?.auto_navigate_to_console ?? true) } as LauncherSettings)}
+                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer flex-shrink-0 {(store.settings.auto_navigate_to_console ?? true) ? 'bg-[var(--accent-primary)]' : 'bg-[var(--bg-hover-strong)]'}"
+                  role="switch"
+                  aria-checked={(store.settings.auto_navigate_to_console ?? true)}
+                  aria-label="Toggle auto-navigate to console"
+                >
+                  <span class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform {(store.settings.auto_navigate_to_console ?? true) ? 'translate-x-[22px]' : 'translate-x-0.5'}"></span>
+                </button>
+              </section>
+
+              <section class="bg-[var(--bg-elevated)] rounded-lg p-4 flex items-center justify-between gap-8">
+                <div class="min-w-0 pr-4">
+                  <h4 class="text-base font-semibold text-[var(--text-primary)]">Run onboarding again</h4>
+                  <p class="text-xs text-[var(--text-muted)] mt-0.5">Revisit first-time setup or import instances from other launchers.</p>
+                </div>
+                <button
+                  onclick={() => { onClose(); setShowOnboarding(true) }}
+                  class="flex-shrink-0 px-4 py-2 text-sm font-medium rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] cursor-pointer transition-colors"
+                >
+                  Show onboarding
+                </button>
+              </section>
+            {:else if activeTab === "storage"}
+              <section id="settings-storage" class="bg-[var(--bg-elevated)] rounded-lg p-4">
+                <h4 class="text-base font-semibold text-[var(--text-primary)] mb-4">Disk usage</h4>
+                {#if storageLoading}
+                  <div class="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                    <Loader2 size={14} class="animate-spin" />
+                    <span>Calculating storage usage...</span>
+                  </div>
+                {:else if storageCategories.length === 0}
+                  <div class="text-xs text-[var(--text-muted)]">No data</div>
+                {:else}
+                  <div class="h-2 rounded-full overflow-hidden flex bg-[var(--bg-primary)]">
+                    {#each storageCategories as cat (cat.name)}
+                      <div
+                        style="width: {(cat.size_bytes / totalBytes) * 100}%; background-color: {storageColors[cat.name] || '#6b7280'}"
+                        class="h-full first:rounded-l-full last:rounded-r-full"
+                      ></div>
+                    {/each}
+                  </div>
+                  <div class="flex flex-wrap gap-x-5 gap-y-1.5 mt-3">
+                    {#each storageCategories as cat (cat.name)}
+                      <div class="flex items-center gap-1.5 text-xs">
+                        <div class="w-2.5 h-2.5 rounded-sm" style="background-color: {storageColors[cat.name] || '#6b7280'}"></div>
+                        <span class="text-[var(--text-muted)]">{cat.name}</span>
+                        <span class="text-[var(--text-primary)] font-medium">{formatBytes(cat.size_bytes)}</span>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+              </section>
+
+              <section id="settings-directory" class="bg-[var(--bg-elevated)] rounded-lg p-4 flex items-center justify-between gap-8">
+                <div class="min-w-0">
+                  <h4 class="text-base font-semibold text-[var(--text-primary)]">Game directory</h4>
+                  <p class="text-xs text-[var(--text-muted)] font-mono break-all mt-0.5">{store.launcherDirectory || "Loading..."}</p>
+                </div>
+                <button
+                  onclick={() => handleOpenDirectory(store.launcherDirectory)}
+                  disabled={!store.launcherDirectory}
+                  class="flex-shrink-0 px-4 py-2 text-sm font-medium rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 text-[var(--text-primary)] cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors"
+                >
+                  <FolderOpen size={14} />
+                  Open folder
+                </button>
+              </section>
+
+              <section class="bg-[var(--bg-elevated)] rounded-lg p-4">
+                <TrashSection onAlert={(alert) => alertModal = alert} />
+              </section>
+            {/if}
           </div>
         </div>
       </div>
