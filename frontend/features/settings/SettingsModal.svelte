@@ -171,9 +171,9 @@
     }
 
     if (javaInstallations.length > 0) {
-      const isCustom = !javaInstallations.includes(store.settings.java_path)
+      const isCustom = !javaInstallations.includes(store.settings?.java_path as string)
       showCustomPath = isCustom
-      if (isCustom) customPathValue = store.settings.java_path
+      if (isCustom) customPathValue = (store.settings?.java_path as string)
       else customPathValue = ""
     }
   })
@@ -484,7 +484,7 @@
                     class="w-full bg-[var(--bg-primary)] px-4 py-2 text-sm text-[var(--text-primary)] text-left flex items-center justify-between cursor-pointer min-w-0 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
                   >
                     <span class="truncate">
-                      {showCustomPath ? "Custom Path..." : (store.settings.java_path || "Auto-detect (Recommended)")}
+                      {showCustomPath ? "Custom Path..." : (store.settings?.java_path || "Auto-detect (Recommended)")}
                     </span>
                     <ChevronDown size={14} class="flex-shrink-0 ml-2 transition-transform {isJavaDropdownOpen ? 'rotate-180' : ''}" />
                   </button>
@@ -496,7 +496,7 @@
                         class="w-full px-4 py-2 text-sm text-left hover:bg-[var(--bg-hover)] text-[var(--text-primary)] first:rounded-t-xl last:rounded-b-xl flex items-center justify-between cursor-pointer"
                       >
                         <span>Auto-detect (Recommended)</span>
-                        {#if !store.settings.java_path && !showCustomPath}<Check size={14} class="text-[var(--accent-primary)]" />{/if}
+                        {#if !store.settings?.java_path && !showCustomPath}<Check size={14} class="text-[var(--accent-primary)]" />{/if}
                       </button>
                       {#each javaInstallations as path (path)}
                         <button
@@ -504,7 +504,7 @@
                           class="w-full px-4 py-2 text-sm text-left hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-between cursor-pointer"
                         >
                           <span class="truncate">{path}</span>
-                          {#if store.settings.java_path === path && !showCustomPath}<Check size={14} class="text-[var(--accent-primary)] flex-shrink-0 ml-2" />{/if}
+                          {#if store.settings?.java_path === path && !showCustomPath}<Check size={14} class="text-[var(--accent-primary)] flex-shrink-0 ml-2" />{/if}
                         </button>
                       {/each}
                       <button
@@ -540,7 +540,7 @@
                     onclick={() => isTabDropdownOpen = !isTabDropdownOpen}
                     class="bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] px-4 py-2 text-sm text-[var(--text-primary)] rounded-lg flex items-center gap-2 cursor-pointer capitalize transition-colors min-w-[140px] justify-between"
                   >
-                    {store.settings.default_tab || "home"}
+                    {store.settings?.default_tab || "home"}
                     <ChevronDown size={14} class="transition-transform {isTabDropdownOpen ? 'rotate-180' : ''}" />
                   </button>
                   {#if isTabDropdownOpen}
@@ -551,7 +551,7 @@
                           class="w-full px-4 py-2 text-sm text-left hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-between cursor-pointer capitalize"
                         >
                           {tab}
-                          {#if (store.settings.default_tab || "home") === tab}<Check size={14} class="text-[var(--accent-primary)]" />{/if}
+                          {#if (store.settings?.default_tab || "home") === tab}<Check size={14} class="text-[var(--accent-primary)]" />{/if}
                         </button>
                       {/each}
                     </div>
@@ -566,12 +566,12 @@
                 </div>
                 <button
                   onclick={() => handleSettingChange({ ...store.settings!, auto_navigate_to_console: !(store.settings?.auto_navigate_to_console ?? true) } as LauncherSettings)}
-                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer flex-shrink-0 {(store.settings.auto_navigate_to_console ?? true) ? 'bg-[var(--accent-primary)]' : 'bg-[var(--bg-hover-strong)]'}"
+                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer flex-shrink-0 {(store.settings?.auto_navigate_to_console ?? true) ? 'bg-[var(--accent-primary)]' : 'bg-[var(--bg-hover-strong)]'}"
                   role="switch"
-                  aria-checked={(store.settings.auto_navigate_to_console ?? true)}
+                  aria-checked={(store.settings?.auto_navigate_to_console ?? true)}
                   aria-label="Toggle auto-navigate to console"
                 >
-                  <span class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform {(store.settings.auto_navigate_to_console ?? true) ? 'translate-x-[22px]' : 'translate-x-0.5'}"></span>
+                  <span class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform {(store.settings?.auto_navigate_to_console ?? true) ? 'translate-x-[22px]' : 'translate-x-0.5'}"></span>
                 </button>
               </section>
 
@@ -581,13 +581,13 @@
                   <p class="text-xs text-[var(--text-muted)] mt-0.5">A cat lays down at the top of the launcher.</p>
                 </div>
                 <button
-                  onclick={() => handleSettingChange({ ...store.settings!, cat_mode: !(store.settings.cat_mode ?? false) } as LauncherSettings)}
-                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer flex-shrink-0 {(store.settings.cat_mode ?? false) ? 'bg-[var(--accent-primary)]' : 'bg-[var(--bg-hover-strong)]'}"
+                  onclick={() => handleSettingChange({ ...store.settings!, cat_mode: !(store.settings?.cat_mode ?? false) } as LauncherSettings)}
+                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer flex-shrink-0 {(store.settings?.cat_mode ?? false) ? 'bg-[var(--accent-primary)]' : 'bg-[var(--bg-hover-strong)]'}"
                   role="switch"
-                  aria-checked={(store.settings.cat_mode ?? false)}
+                  aria-checked={(store.settings?.cat_mode ?? false)}
                   aria-label="Toggle cat mode"
                 >
-                  <span class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform {(store.settings.cat_mode ?? false) ? 'translate-x-[22px]' : 'translate-x-0.5'}"></span>
+                  <span class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform {(store.settings?.cat_mode ?? false) ? 'translate-x-[22px]' : 'translate-x-0.5'}"></span>
                 </button>
               </section>
 
