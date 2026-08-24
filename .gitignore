@@ -16,8 +16,6 @@ dist-ssr
 
 database/supabase/.temp/
 
-src-tauri/commit_hash.txt
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
