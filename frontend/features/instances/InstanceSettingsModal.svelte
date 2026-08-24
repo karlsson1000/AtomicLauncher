@@ -93,6 +93,7 @@
   let instanceMemoryMb = $state(4096)
   let systemInfo = $state<SystemInfo | null>(null)
   let ramSaveTimeout: ReturnType<typeof setTimeout> | undefined
+  let closeTimer: ReturnType<typeof setTimeout> | undefined
 
   $effect(() => {
     newName = instance.name
@@ -407,9 +408,20 @@
   }
 
   function handleClose() {
+    if (isClosing) return
     isClosing = true
-    setTimeout(() => { onClose() }, 150)
+    closeTimer = setTimeout(() => {
+      isClosing = false
+      onClose()
+    }, 150)
   }
+
+  $effect(() => {
+    if (isOpen) {
+      clearTimeout(closeTimer)
+      isClosing = false
+    }
+  })
 
   async function handleRename(trimmedName: string) {
     if (!trimmedName) { renameError = "Instance name cannot be empty"; return }
