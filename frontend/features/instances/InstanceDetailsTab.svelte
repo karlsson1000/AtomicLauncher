@@ -497,7 +497,7 @@
                 <span class="px-2 py-0.5 bg-[var(--bg-tertiary)] text-[var(--text-muted)] text-xs rounded">{installedMods.length} mod{installedMods.length === 1 ? "" : "s"}</span>
               </div>
               <div class="flex items-center gap-2">
-                {#if (instance.loader === "fabric" || instance.loader === "neoforge") && modsWithProjectId > 0}
+                {#if instance.loader === "fabric"}
                   {#if availableUpdates.length > 0}
                     <button onclick={updateAllMods} disabled={isUpdatingMods} class="flex items-center gap-1.5 px-2 py-0.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded text-xs font-medium transition-colors cursor-pointer">
                       {#if isUpdatingMods}
