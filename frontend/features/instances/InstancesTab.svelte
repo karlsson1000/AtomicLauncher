@@ -226,7 +226,7 @@
       { label: "Duplicate", icon: Copy, onClick: () => handleDuplicateInstance(cm.instance) },
       { label: "Export", icon: FileArchive, onClick: () => { setExportModal(cm.instance); contextMenu = null } },
       { separator: true },
-      { label: "Save Options as Default", icon: Save, onClick: () => { handleSaveOptionsAsDefault(cm.instance.name); contextMenu = null } },
+      { label: "Save Instance Options", icon: Save, onClick: () => { handleSaveOptionsAsDefault(cm.instance.name); contextMenu = null } },
       { label: "Apply Saved Options", icon: ClipboardCheck, onClick: () => { handleApplySavedOptions(cm.instance.name); contextMenu = null } },
       { separator: true },
       { label: "Add to group", icon: FolderPlus, onClick: () => { groupModalInstance = cm.instance; groupModalValue = ""; showGroupModal = true; contextMenu = null } },

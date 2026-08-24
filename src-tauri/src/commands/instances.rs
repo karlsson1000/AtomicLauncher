@@ -339,7 +339,7 @@ pub async fn save_options_as_default(instance_name: String) -> Result<(), String
         ));
     }
 
-    std::fs::copy(&source, get_default_options_path()).map_err(|e| e.to_string())?;
+    std::fs::copy(&source, get_saved_options_path()).map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -348,7 +348,7 @@ pub async fn save_options_as_default(instance_name: String) -> Result<(), String
 pub async fn apply_saved_options(instance_name: String) -> Result<(), String> {
     let safe_name = sanitize_instance_name(&instance_name)?;
 
-    let default_options = get_default_options_path();
+    let default_options = get_saved_options_path();
     if !default_options.exists() {
         return Err("No default options saved yet".to_string());
     }

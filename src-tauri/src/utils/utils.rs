@@ -76,8 +76,8 @@ pub fn get_trash_index_path() -> PathBuf {
     get_trash_dir().join("trash_index.json")
 }
 
-pub fn get_default_options_path() -> PathBuf {
-    get_launcher_dir().join("default-options.txt")
+pub fn get_saved_options_path() -> PathBuf {
+    get_launcher_dir().join("saved-options.txt")
 }
 
 pub fn find_java() -> Option<String> {
