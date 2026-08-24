@@ -4,7 +4,7 @@
   import ConfirmModal from "../../components/ui/ConfirmModal.svelte"
   import AlertModal from "../../components/ui/AlertModal.svelte"
   import type { Instance, FabricVersion, NeoForgeVersion, ForgeVersion, LauncherSettings } from "../../types"
-  import { handleInstanceRenamed, deleteInstanceOptimistically } from "../../lib/launcherStore.svelte"
+  import { store, handleInstanceRenamed, deleteInstanceOptimistically } from "../../lib/launcherStore.svelte"
 
   interface SystemInfo {
     total_memory_mb: number
@@ -430,6 +430,10 @@
   }
 
   function handleDelete() {
+    if (store.runningInstances.has(instance.name)) {
+      alertModal = { isOpen: true, title: "Instance is running", message: `Stop "${instance.name}" before deleting it.`, type: "warning" }
+      return
+    }
     confirmModal = {
       isOpen: true,
       title: "Delete Instance",

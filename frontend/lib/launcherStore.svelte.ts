@@ -257,6 +257,10 @@ async function handleLaunch(instance: Instance) {
 let skipTrash = false
 
 function handleDeleteInstance(instanceName: string) {
+  if (store.runningInstances.has(instanceName)) {
+    showToast("error", `Stop "${instanceName}" before deleting it`, 5000)
+    return
+  }
   skipTrash = false
   store.confirmModal = {
     isOpen: true,
