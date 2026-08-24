@@ -4,7 +4,7 @@
   import ConfirmModal from "../../components/ui/ConfirmModal.svelte"
   import AlertModal from "../../components/ui/AlertModal.svelte"
   import InstanceSettingsModal from "./InstanceSettingsModal.svelte"
-  import type { Instance, ModFileWithMetadata, ModrinthVersion, ModrinthFile } from "../../types"
+  import type { Instance, ModFileWithMetadata } from "../../types"
   import { getMinecraftVersion } from "../../lib/version"
   import { formatFileSize, formatPlaytime, formatDate } from "../../lib/format"
   import {
@@ -17,11 +17,8 @@
   interface ModUpdate {
     filename: string
     projectId: string
-    currentVersionId: string
     latestVersion: {
       id: string
-      name: string
-      version_number: string
       downloadUrl: string
       filename: string
     }
@@ -157,43 +154,13 @@
     if (!instance || (instance.loader !== "fabric" && instance.loader !== "neoforge" && instance.loader !== "forge")) return
 
     isCheckingUpdates = true
-    const updates: ModUpdate[] = []
 
     try {
-      const mcVersion = getMinecraftVersion(instance)
-
-      for (const mod of installedMods) {
-        if (!mod.project_id || !mod.current_version_id || mod.disabled) continue
-
-        try {
-          const versions = await invoke<ModrinthVersion[]>("get_mod_versions", {
-            idOrSlug: mod.project_id,
-            loaders: [instance.loader],
-            gameVersions: [mcVersion],
-          })
-
-          if (versions && versions.length > 0) {
-            const latestVersion = versions[0]
-
-            if (latestVersion.id !== mod.current_version_id) {
-              const primaryFile = latestVersion.files.find((f: ModrinthFile) => f.primary) || latestVersion.files[0]
-
-              if (primaryFile) {
-                updates.push({
-                  filename: mod.filename,
-                  projectId: mod.project_id,
-                  currentVersionId: mod.current_version_id,
-                  latestVersion: { id: latestVersion.id, name: latestVersion.name, version_number: latestVersion.version_number, downloadUrl: primaryFile.url, filename: primaryFile.filename },
-                })
-              }
-            }
-          }
-        } catch (error) {
-          console.error(`Failed to check updates for ${mod.name || mod.filename}:`, error)
-        }
-      }
-
-      availableUpdates = updates
+      availableUpdates = await invoke<ModUpdate[]>("check_mod_updates", {
+        instanceName: instance.name,
+        loader: instance.loader,
+        gameVersion: getMinecraftVersion(instance),
+      })
     } catch (error) {
       console.error("Failed to check for updates:", error)
       alertModal = { isOpen: true, title: "Error", message: `Failed to check for updates: ${String(error)}`, type: "danger" }
@@ -202,23 +169,33 @@
     }
   }
 
+  async function applyModUpdate(update: ModUpdate) {
+    await invoke("download_mod", { instanceName: instance.name, downloadUrl: update.latestVersion.downloadUrl, filename: update.latestVersion.filename })
+    if (update.filename !== update.latestVersion.filename) {
+      await invoke("delete_mod", { instanceName: instance.name, filename: update.filename }).catch((err: Error) =>
+        console.error(`Failed to delete old version ${update.filename}:`, err)
+      )
+    }
+  }
+
   async function updateAllMods() {
     if (availableUpdates.length === 0) return
 
     isUpdatingMods = true
 
-    for (const update of availableUpdates) {
-      try {
-        await invoke("download_mod", { instanceName: instance.name, downloadUrl: update.latestVersion.downloadUrl, filename: update.latestVersion.filename })
-        if (update.filename !== update.latestVersion.filename) {
-          await invoke("delete_mod", { instanceName: instance.name, filename: update.filename }).catch((err: Error) =>
-            console.error(`Failed to delete old version ${update.filename}:`, err)
-          )
+    const queue = [...availableUpdates]
+    const workers = Array.from({ length: Math.min(4, queue.length) }, async () => {
+      while (queue.length > 0) {
+        const update = queue.shift()
+        if (!update) break
+        try {
+          await applyModUpdate(update)
+        } catch (error) {
+          console.error(`Failed to update mod ${update.filename}:`, error)
         }
-      } catch (error) {
-        console.error(`Failed to update mod ${update.filename}:`, error)
       }
-    }
+    })
+    await Promise.all(workers)
 
     isUpdatingMods = false
     availableUpdates = []
@@ -228,12 +205,7 @@
 
   async function updateSingleMod(update: ModUpdate) {
     try {
-      await invoke("download_mod", { instanceName: instance.name, downloadUrl: update.latestVersion.downloadUrl, filename: update.latestVersion.filename })
-      if (update.filename !== update.latestVersion.filename) {
-        await invoke("delete_mod", { instanceName: instance.name, filename: update.filename }).catch((err: Error) =>
-          console.error(`Failed to delete old version ${update.filename}:`, err)
-        )
-      }
+      await applyModUpdate(update)
       availableUpdates = availableUpdates.filter(u => u.filename !== update.filename)
       await loadInstalledMods()
     } catch (error) {

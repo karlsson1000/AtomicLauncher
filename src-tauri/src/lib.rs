@@ -211,6 +211,7 @@ pub fn run() {    if let Err(e) = dotenvy::dotenv() {
             open_instance_folder,
             search_mods,
             get_mod_versions,
+            check_mod_updates,
             download_mod,
             get_project_details,
             get_settings,

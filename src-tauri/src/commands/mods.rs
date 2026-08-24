@@ -158,6 +158,10 @@ pub fn open_mods_folder(instance_name: String) -> Result<(), String> {
 pub async fn get_installed_mod_hashes(instance_name: String) -> Result<Vec<ModHash>, String> {
     let safe_name = sanitize_instance_name(&instance_name)?;
     let instance_dir = get_instance_dir(&safe_name);
+    collect_mod_hashes(&instance_dir)
+}
+
+fn collect_mod_hashes(instance_dir: &std::path::Path) -> Result<Vec<ModHash>, String> {
     let mods_dir = instance_dir.join("mods");
 
     if !mods_dir.exists() {
@@ -530,6 +534,76 @@ pub async fn get_mod_versions(
         .get_project_versions(&id_or_slug, loaders, game_versions)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Serialize)]
+pub struct ModUpdate {
+    pub filename: String,
+    #[serde(rename = "projectId")]
+    pub project_id: String,
+    #[serde(rename = "latestVersion")]
+    pub latest_version: LatestVersionInfo,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LatestVersionInfo {
+    pub id: String,
+    #[serde(rename = "downloadUrl")]
+    pub download_url: String,
+    pub filename: String,
+}
+
+#[tauri::command]
+pub async fn check_mod_updates(
+    instance_name: String,
+    loader: String,
+    game_version: String,
+) -> Result<Vec<ModUpdate>, String> {
+    let safe_name = sanitize_instance_name(&instance_name)?;
+
+    if !loader.chars().all(|c| c.is_alphanumeric() || c == '-') {
+        return Err("Invalid loader name".to_string());
+    }
+    if !game_version.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-') {
+        return Err("Invalid game version".to_string());
+    }
+
+    let instance_dir = get_instance_dir(&safe_name);
+    let installed = tauri::async_runtime::spawn_blocking(move || collect_mod_hashes(&instance_dir))
+        .await
+        .map_err(|e| e.to_string())??;
+
+    let eligible: Vec<ModHash> = installed.into_iter().filter(|m| !m.disabled).collect();
+    if eligible.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let hashes: Vec<String> = eligible.iter().map(|m| m.sha1_hash.clone()).collect();
+    let client = ModrinthClient::new().map_err(|e| e.to_string())?;
+    let latest = client
+        .get_latest_version_files_by_hashes(&hashes, Some(vec![game_version]), Some(vec![loader]))
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mut updates = Vec::new();
+    for mh in &eligible {
+        let Some(resp) = latest.get(&mh.sha1_hash) else { continue };
+        if resp.files.iter().any(|f| f.hashes.sha1 == mh.sha1_hash) {
+            continue;
+        }
+        let Some(file) = resp.files.iter().find(|f| f.primary).or_else(|| resp.files.first()) else { continue };
+        updates.push(ModUpdate {
+            filename: mh.filename.clone(),
+            project_id: resp.project_id.clone(),
+            latest_version: LatestVersionInfo {
+                id: resp.id.clone(),
+                download_url: file.url.clone(),
+                filename: file.filename.clone(),
+            },
+        });
+    }
+
+    Ok(updates)
 }
 
 #[tauri::command]
