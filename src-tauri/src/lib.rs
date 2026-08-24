@@ -194,7 +194,6 @@ pub fn run() {    if let Err(e) = dotenvy::dotenv() {
             get_forge_supported_game_versions,
             install_forge,
             get_all_screenshots,
-            get_screenshot_data,
             delete_screenshot,
             open_screenshot,
             open_screenshots_folder,

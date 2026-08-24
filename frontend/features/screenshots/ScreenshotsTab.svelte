@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core"
+  import { convertFileSrc } from "@tauri-apps/api/core"
   import { Camera, Package, X, Trash2, ExternalLink, ChevronLeft, ChevronRight, Calendar, Check, FolderOpen } from "lucide-svelte"
   import type { Screenshot } from "../../types"
   import { formatFileSize, formatDate } from "../../lib/format"
@@ -25,22 +26,10 @@
     }
   }
 
-  async function getImageData(path: string): Promise<string> {
-    if (imageDataMap[path]) return imageDataMap[path]
-    try {
-      const dataUrl = await invoke<string>("get_screenshot_data", { path })
-      imageDataMap[path] = dataUrl
-      return dataUrl
-    } catch (error) {
-      console.error("Failed to load screenshot data:", error)
-      return ""
-    }
-  }
-
   async function handleDeleteScreenshot(screenshot: Screenshot) {
     try {
       await invoke("delete_screenshot", { path: screenshot.path })
-      delete imageDataMap[screenshot.path]
+      delete startedImages[screenshot.path]
       await loadScreenshots()
     } catch (error) {
       console.error("Failed to delete screenshot:", error)
@@ -76,9 +65,9 @@
     currentImageIndex = index
     viewerOpen = true
     const screenshot = filteredScreenshots[index]
-    if (screenshot) getImageData(screenshot.path)
-    if (filteredScreenshots[index + 1]) getImageData(filteredScreenshots[index + 1].path)
-    if (filteredScreenshots[index - 1]) getImageData(filteredScreenshots[index - 1].path)
+    if (screenshot) startImage(screenshot.path)
+    if (filteredScreenshots[index + 1]) startImage(filteredScreenshots[index + 1].path)
+    if (filteredScreenshots[index - 1]) startImage(filteredScreenshots[index - 1].path)
   }
 
   function closeViewer() { viewerOpen = false }
@@ -86,13 +75,13 @@
   function nextImage() {
     const newIndex = (currentImageIndex + 1) % filteredScreenshots.length
     currentImageIndex = newIndex
-    if (filteredScreenshots[newIndex + 1]) getImageData(filteredScreenshots[newIndex + 1].path)
+    if (filteredScreenshots[newIndex + 1]) startImage(filteredScreenshots[newIndex + 1].path)
   }
 
   function prevImage() {
     const newIndex = currentImageIndex === 0 ? filteredScreenshots.length - 1 : currentImageIndex - 1
     currentImageIndex = newIndex
-    if (filteredScreenshots[newIndex - 1]) getImageData(filteredScreenshots[newIndex - 1].path)
+    if (filteredScreenshots[newIndex - 1]) startImage(filteredScreenshots[newIndex - 1].path)
   }
 
   function handleViewerDelete(s: Screenshot) {
@@ -101,13 +90,17 @@
   }
 
   let skeletonItems = Array.from({ length: 8 })
-  let imageDataMap = $state<Record<string, string>>({})
+  let startedImages = $state<Record<string, boolean>>({})
+
+  function startImage(path: string) {
+    if (!startedImages[path]) startedImages[path] = true
+  }
 
   function lazyLoad(node: HTMLElement, path: string) {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          getImageData(path)
+          startImage(path)
           observer.disconnect()
         }
       },
@@ -246,14 +239,16 @@
               onkeydown={(e) => { if (e.key === 'Enter') openViewer(index) }}
               class="group relative bg-[var(--bg-tertiary)] rounded-md overflow-hidden cursor-pointer transition-all hover:bg-[var(--bg-hover)] screenshot-card"
             >
-              <div class="aspect-video bg-[var(--bg-secondary)] overflow-hidden relative" style="opacity: {imageDataMap[screenshot.path] ? 1 : 0}; transition: opacity 0.2s">
-                {#if !imageDataMap[screenshot.path]}
+              <div class="aspect-video bg-[var(--bg-secondary)] overflow-hidden relative" style="opacity: {startedImages[screenshot.path] ? 1 : 0}; transition: opacity 0.2s">
+                {#if !startedImages[screenshot.path]}
                   <div class="absolute inset-0 bg-[var(--bg-tertiary)] animate-pulse"></div>
                 {:else}
                   <img
-                    src={imageDataMap[screenshot.path]}
+                    src={convertFileSrc(screenshot.path)}
                     alt={screenshot.filename}
                     class="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
                 {/if}
               </div>
@@ -316,11 +311,11 @@
               <ChevronRight size={24} />
             </button>
           {/if}
-          <div class="flex items-center justify-center w-full h-full" style="opacity: {imageDataMap[filteredScreenshots[currentImageIndex].path] ? 1 : 0}; transition: opacity 0.2s">
-            {#if !imageDataMap[filteredScreenshots[currentImageIndex].path]}
+          <div class="flex items-center justify-center w-full h-full" style="opacity: {startedImages[filteredScreenshots[currentImageIndex].path] ? 1 : 0}; transition: opacity 0.2s">
+            {#if !startedImages[filteredScreenshots[currentImageIndex].path]}
               <div class="w-full max-w-[900px] aspect-video bg-[var(--bg-tertiary)] animate-pulse rounded-lg"></div>
             {:else}
-              <img src={imageDataMap[filteredScreenshots[currentImageIndex].path]} alt={filteredScreenshots[currentImageIndex].filename} class="max-w-[85vw] max-h-[83vh] object-contain rounded-md" />
+              <img src={convertFileSrc(filteredScreenshots[currentImageIndex].path)} alt={filteredScreenshots[currentImageIndex].filename} class="max-w-[85vw] max-h-[83vh] object-contain rounded-md" />
             {/if}
           </div>
         </div>
