@@ -252,7 +252,7 @@
               <Loader2 size={22} class="animate-spin text-[var(--accent-primary)]" />
             </div>
           {:else if detected.length > 0}
-            <div class="mt-8 max-h-[45vh] overflow-y-auto custom-scrollbar -mx-2 px-2 space-y-0.5">
+            <div class="mt-4 max-h-[54vh] overflow-y-auto custom-scrollbar -mx-2 px-2 space-y-0.5">
               {#each detected as item (item.path)}
                 <label
                   class="flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors {!item.mc_version || isImporting
@@ -285,7 +285,7 @@
             </div>
           {/if}
 
-          <div class="mt-10 flex items-center justify-between">
+          <div class="mt-6 flex items-center justify-between">
             <button
               onclick={() => goTo("welcome")}
               disabled={isImporting}
