@@ -31,9 +31,7 @@ async fn set_all_accounts_offline(app: &tauri::AppHandle) {
 
 #[tauri::command]
 fn get_app_version() -> String {
-    let version = env!("CARGO_PKG_VERSION");
-    let commit_hash = include_str!("../commit_hash.txt").trim();
-    format!("{}-{}", version, commit_hash)
+    format!("{}-{}", env!("CARGO_PKG_VERSION"), env!("OCTANE_COMMIT_HASH"))
 }
 
 #[tauri::command]
