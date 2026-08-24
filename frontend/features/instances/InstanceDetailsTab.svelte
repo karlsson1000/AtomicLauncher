@@ -390,7 +390,6 @@
 
   function handleInstanceDeleted() {
     handleCloseDetails()
-    loadInstances()
   }
 
   let fabricLoaderVersion = $derived(getFabricLoaderVersion(instance))

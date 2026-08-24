@@ -256,7 +256,7 @@ async function handleLaunch(instance: Instance) {
 
 let skipTrash = false
 
-async function handleDeleteInstance(instanceName: string) {
+function handleDeleteInstance(instanceName: string) {
   skipTrash = false
   store.confirmModal = {
     isOpen: true,
@@ -265,19 +265,34 @@ async function handleDeleteInstance(instanceName: string) {
     type: "danger",
     checkboxLabel: "Delete permanently",
     onCheckboxChange: (checked: boolean) => { skipTrash = checked },
-    onConfirm: async () => {
+    onConfirm: () => {
       store.confirmModal = null
-      try {
-        await invoke<string>("delete_instance", { instanceName, permanent: skipTrash })
-        await loadInstances()
-        if (store.selectedInstance?.name === instanceName) {
-          store.selectedInstance = store.instances.length > 1 ? store.instances.find(i => i.name !== instanceName) || null : null
-        }
-      } catch (error) {
-        console.error("Delete error:", error)
-      }
+      deleteInstanceOptimistically(instanceName, skipTrash)
     }
   }
+}
+
+function deleteInstanceOptimistically(instanceName: string, permanent: boolean) {
+  const index = store.instances.findIndex(i => i.name === instanceName)
+  if (index === -1) return
+  const removed = store.instances[index]
+
+  store.instances = store.instances.filter(i => i.name !== instanceName)
+  if (store.selectedInstance?.name === instanceName) {
+    store.selectedInstance = store.instances.length > 0
+      ? store.instances[Math.min(index, store.instances.length - 1)]
+      : null
+  }
+
+  invoke<string>("delete_instance", { instanceName, permanent })
+    .then(() => showToast("success", `Deleted "${instanceName}"`, 5000))
+    .catch((error) => {
+      console.error("Delete error:", error)
+      const restored = [...store.instances]
+      restored.splice(Math.min(index, restored.length), 0, removed)
+      store.instances = restored
+      showToast("error", `Failed to delete ${instanceName}: ${String(error)}`)
+    })
 }
 
 async function handleDuplicateInstance(instance: Instance) {
@@ -528,6 +543,7 @@ export {
   handleInstallUpdate,
   handleLaunch,
   handleDeleteInstance,
+  deleteInstanceOptimistically,
   handleDuplicateInstance,
   handleOpenInstanceFolderByInstance,
   handleShowDetails,

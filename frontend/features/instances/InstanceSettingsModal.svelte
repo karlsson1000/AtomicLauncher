@@ -4,7 +4,7 @@
   import ConfirmModal from "../../components/ui/ConfirmModal.svelte"
   import AlertModal from "../../components/ui/AlertModal.svelte"
   import type { Instance, FabricVersion, NeoForgeVersion, ForgeVersion, LauncherSettings } from "../../types"
-  import { handleInstanceRenamed } from "../../lib/launcherStore.svelte"
+  import { handleInstanceRenamed, deleteInstanceOptimistically } from "../../lib/launcherStore.svelte"
 
   interface SystemInfo {
     total_memory_mb: number
@@ -22,7 +22,6 @@
     onInstanceRenamed?: (oldName: string, newName: string) => void
   } = $props()
 
-  let isDeleting = $state(false)
   let newName = $state("")
   let renameError = $state<string | null>(null)
   let isRenamingInstance = $state(false)
@@ -436,19 +435,11 @@
       title: "Delete Instance",
       message: `Are you sure you want to delete "${instance.name}"?\n\nThis action cannot be undone.`,
       type: "danger",
-      onConfirm: async () => {
-        isDeleting = true
+      onConfirm: () => {
         confirmModal = null
-        try {
-          await invoke("delete_instance", { instanceName: instance.name, permanent: true })
-          onInstanceDeleted()
-          onClose()
-        } catch (error) {
-          console.error("Failed to delete instance:", error)
-          alertModal = { isOpen: true, title: "An error occurred", message: `Failed to delete instance: ${String(error)}`, type: "danger" }
-        } finally {
-          isDeleting = false
-        }
+        onClose()
+        onInstanceDeleted()
+        deleteInstanceOptimistically(instance.name, true)
       }
     }
   }
@@ -771,16 +762,10 @@
           <div class="col-span-2 pt-3">
             <button
               onclick={handleDelete}
-              disabled={isDeleting}
-              class="w-full px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded font-medium text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+              class="w-full px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded font-medium text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
-              {#if isDeleting}
-                <Loader2 size={16} class="animate-spin" />
-                <span>Deleting...</span>
-              {:else}
-                <Trash2 size={16} />
-                <span>Delete Instance</span>
-              {/if}
+              <Trash2 size={16} />
+              <span>Delete Instance</span>
             </button>
           </div>
         </div>
