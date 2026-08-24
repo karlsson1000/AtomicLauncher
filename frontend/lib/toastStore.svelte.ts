@@ -12,7 +12,7 @@ export const toastStore = $state<{ toasts: Toast[] }>({ toasts: [] })
 
 let nextId = 1
 
-export function showToast(type: ToastType, message: string, duration = 30000) {
+export function showToast(type: ToastType, message: string, duration = 15000) {
   untrack(() => {
     const id = nextId++
     toastStore.toasts.push({ id, type, message })

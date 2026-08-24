@@ -19,16 +19,16 @@
       await invoke("save_options_as_default", { instanceName: name })
       showToast("success", "Options saved", 5000)
     } catch (error) {
-      showToast("error", `Failed to save options: ${error}`, 6000)
+      showToast("error", `Failed to save options: ${error}`, 5000)
     }
   }
 
   async function handleApplySavedOptions(name: string) {
     try {
       await invoke("apply_saved_options", { instanceName: name })
-      showToast("success", "Saved options applied", 4000)
+      showToast("success", "Saved options applied", 5000)
     } catch (error) {
-      showToast("error", `Failed to apply options: ${error}`, 6000)
+      showToast("error", `Failed to apply options: ${error}`, 5000)
     }
   }
 
