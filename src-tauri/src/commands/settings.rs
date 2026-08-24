@@ -264,50 +264,66 @@ pub async fn get_storage_usage() -> Result<Vec<StorageCategory>, String> {
     let launcher_dir = crate::utils::get_launcher_dir();
     let instances_dir = crate::utils::get_instances_dir();
     let meta_dir = crate::utils::get_meta_dir();
-
-    let mut categories = Vec::new();
-
-    let mut total: u64 = 0;
-
-    if instances_dir.exists() {
-        let size = dir_size(&instances_dir);
-        categories.push(StorageCategory { name: "Instances".to_string(), size_bytes: size });
-        total += size;
-    }
-
-    if meta_dir.exists() {
-        let size = dir_size(&meta_dir);
-        categories.push(StorageCategory { name: "Cache".to_string(), size_bytes: size });
-        total += size;
-    }
-
     let trash_dir = crate::utils::get_trash_dir();
-    if trash_dir.exists() {
-        let size = dir_size(&trash_dir);
-        if size > 0 {
-            categories.push(StorageCategory { name: "Trash".to_string(), size_bytes: size });
-            total += size;
-        }
-    }
 
-    let other = dir_size(&launcher_dir).saturating_sub(total);
-    if other > 0 {
-        categories.push(StorageCategory { name: "Other".to_string(), size_bytes: other });
-    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let instances_exists = instances_dir.exists();
+        let cache_exists = meta_dir.exists();
 
-    Ok(categories)
+        std::thread::scope(|s| {
+            let known = [instances_dir.clone(), meta_dir.clone(), trash_dir.clone()];
+            let h_instances = s.spawn(|| dir_size(&instances_dir));
+            let h_cache = s.spawn(|| dir_size(&meta_dir));
+            let h_trash = s.spawn(|| dir_size(&trash_dir));
+            let h_other = s.spawn(move || dir_size_skipping(&launcher_dir, &known));
+
+            let instances_size = h_instances.join().unwrap_or_default();
+            let cache_size = h_cache.join().unwrap_or_default();
+            let trash_size = h_trash.join().unwrap_or_default();
+            let other_size = h_other.join().unwrap_or_default();
+
+            let mut categories = Vec::new();
+
+            if instances_exists {
+                categories.push(StorageCategory { name: "Instances".to_string(), size_bytes: instances_size });
+            }
+            if cache_exists {
+                categories.push(StorageCategory { name: "Cache".to_string(), size_bytes: cache_size });
+            }
+            if trash_size > 0 {
+                categories.push(StorageCategory { name: "Trash".to_string(), size_bytes: trash_size });
+            }
+            if other_size > 0 {
+                categories.push(StorageCategory { name: "Other".to_string(), size_bytes: other_size });
+            }
+
+            Ok(categories)
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 fn dir_size(path: &std::path::Path) -> u64 {
+    dir_size_skipping(path, &[])
+}
+
+fn dir_size_skipping(path: &std::path::Path, skip: &[PathBuf]) -> u64 {
     let mut total = 0u64;
-    if let Ok(entries) = std::fs::read_dir(path) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                total += dir_size(&path);
-            } else if path.is_file() {
-                total += path.metadata().map(|m| m.len()).unwrap_or(0);
-            }
+    let Ok(entries) = std::fs::read_dir(path) else { return 0 };
+    for entry in entries.flatten() {
+        let Ok(file_type) = entry.file_type() else { continue };
+        if file_type.is_symlink() {
+            continue;
+        }
+        let path = entry.path();
+        if skip.iter().any(|root| path == *root) {
+            continue;
+        }
+        if file_type.is_dir() {
+            total += dir_size_skipping(&path, skip);
+        } else if file_type.is_file() {
+            total += entry.metadata().map(|m| m.len()).unwrap_or(0);
         }
     }
     total
