@@ -45,6 +45,7 @@ export interface LauncherSettings {
   auto_navigate_to_console?: boolean
   theme?: string
   default_tab?: string
+  cat_mode?: boolean
 }
 
 export interface MinecraftOptions {

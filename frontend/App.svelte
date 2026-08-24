@@ -83,6 +83,10 @@
   <img src="https://renders.stellarmc.gg/bust/{store.activeAccount.username}" alt="" aria-hidden="true" class="fixed opacity-0 pointer-events-none" />
 {/if}
 
+{#if store.settings?.cat_mode}
+  <img src="/cat.webp" alt="" aria-hidden="true" class="fixed top-0 left-1/2 -translate-x-1/2 z-40 h-12 w-auto pointer-events-none select-none" />
+{/if}
+
 <div class="flex flex-col h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden font-sans {store.settings?.theme ? `theme-${store.settings.theme}` : 'theme-octane'}">
   <TitleBar />
 

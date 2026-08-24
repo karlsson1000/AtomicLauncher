@@ -576,6 +576,22 @@
               </section>
 
               <section class="bg-[var(--bg-elevated)] rounded-lg p-4 flex items-center justify-between gap-8">
+                <div class="min-w-0">
+                  <h4 class="text-base font-semibold text-[var(--text-primary)]">Cat mode</h4>
+                  <p class="text-xs text-[var(--text-muted)] mt-0.5">A cat lays down at the top of the launcher.</p>
+                </div>
+                <button
+                  onclick={() => handleSettingChange({ ...store.settings!, cat_mode: !(store.settings.cat_mode ?? false) } as LauncherSettings)}
+                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer flex-shrink-0 {(store.settings.cat_mode ?? false) ? 'bg-[var(--accent-primary)]' : 'bg-[var(--bg-hover-strong)]'}"
+                  role="switch"
+                  aria-checked={(store.settings.cat_mode ?? false)}
+                  aria-label="Toggle cat mode"
+                >
+                  <span class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform {(store.settings.cat_mode ?? false) ? 'translate-x-[22px]' : 'translate-x-0.5'}"></span>
+                </button>
+              </section>
+
+              <section class="bg-[var(--bg-elevated)] rounded-lg p-4 flex items-center justify-between gap-8">
                 <div class="min-w-0 pr-4">
                   <h4 class="text-base font-semibold text-[var(--text-primary)]">Run onboarding again</h4>
                   <p class="text-xs text-[var(--text-muted)] mt-0.5">Revisit first-time setup or import instances from other launchers.</p>

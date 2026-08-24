@@ -104,6 +104,8 @@ pub struct LauncherSettings {
     pub theme: String,
     #[serde(default = "default_tab")]
     pub default_tab: String,
+    #[serde(default)]
+    pub cat_mode: bool,
 }
 
 fn default_memory() -> u32 { 4096 }
@@ -119,6 +121,7 @@ impl Default for LauncherSettings {
             auto_navigate_to_console: true,
             theme: default_theme(),
             default_tab: default_tab(),
+            cat_mode: false,
         }
     }
 }
