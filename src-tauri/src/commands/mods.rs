@@ -1,5 +1,5 @@
 use crate::commands::validation::{sanitize_instance_name, sanitize_mod_filename, sanitize_filename, sanitize_resourcepack_filename, sanitize_shaderpack_filename, validate_download_url};
-use crate::utils::{get_instance_dir, open_folder};
+use crate::utils::get_instance_dir;
 use crate::utils::curseforge::{CurseforgeClient, CurseforgeGetModFilesResult, CurseforgeSearchResult, CurseforgeModDetail};
 use crate::utils::modrinth::{ModrinthClient, ModrinthProjectDetails, ModrinthSearchResult, ModrinthVersion};
 use tauri::Manager;
@@ -136,29 +136,6 @@ pub async fn delete_mod(instance_name: String, filename: String) -> Result<(), S
     invalidate_mod_cache(&safe_name);
 
     Ok(())
-}
-
-#[tauri::command]
-pub fn open_mods_folder(instance_name: String) -> Result<(), String> {
-    let safe_name = sanitize_instance_name(&instance_name)?;
-    
-    let instance_dir = get_instance_dir(&safe_name);
-    let mods_dir = instance_dir.join("mods");
-    
-    if !mods_dir.exists() {
-        std::fs::create_dir_all(&mods_dir)
-            .map_err(|e| e.to_string())?;
-    }
-    
-    open_folder(mods_dir)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn get_installed_mod_hashes(instance_name: String) -> Result<Vec<ModHash>, String> {
-    let safe_name = sanitize_instance_name(&instance_name)?;
-    let instance_dir = get_instance_dir(&safe_name);
-    collect_mod_hashes(&instance_dir)
 }
 
 fn collect_mod_hashes(instance_dir: &std::path::Path) -> Result<Vec<ModHash>, String> {

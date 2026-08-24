@@ -2,41 +2,11 @@ use crate::models::Instance;
 use crate::services::instance::InstanceManager;
 use crate::services::installer::MinecraftInstaller;
 use crate::services::fabric::FabricInstaller;
-use crate::utils::modrinth::{ModrinthClient, ModrinthVersion};
+use crate::utils::modrinth::ModrinthClient;
 use crate::utils::*;
 use crate::commands::validation::{sanitize_instance_name, validate_download_url};
 use crate::utils::curseforge::CurseforgeClient;
 use tauri::Emitter;
-
-#[tauri::command]
-pub async fn get_modpack_versions(
-    id_or_slug: String,
-    game_version: Option<String>,
-) -> Result<Vec<ModrinthVersion>, String> {
-    if !id_or_slug.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
-        return Err("Invalid modpack ID or slug format".to_string());
-    }
-
-    if id_or_slug.len() > 100 {
-        return Err("Modpack ID or slug too long".to_string());
-    }
-
-    if let Some(ref version) = game_version {
-        if !version.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-') {
-            return Err("Invalid game version format".to_string());
-        }
-    }
-
-    let client = ModrinthClient::new().map_err(|e| e.to_string())?;
-    client
-        .get_project_versions(
-            &id_or_slug,
-            None,
-            game_version.map(|v| vec![v]),
-        )
-        .await
-        .map_err(|e| e.to_string())
-}
 
 #[tauri::command]
 pub async fn install_modpack(
@@ -270,54 +240,6 @@ fn extract_modpack(
     }
 
     Ok(())
-}
-
-#[tauri::command]
-pub async fn get_modpack_manifest(
-    modpack_slug: String,
-    version_id: String,
-) -> Result<serde_json::Value, String> {
-    if !modpack_slug.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
-        return Err("Invalid modpack slug format".to_string());
-    }
-
-    if !version_id.chars().all(|c| c.is_alphanumeric() || c == '-') {
-        return Err("Invalid version ID format".to_string());
-    }
-
-    let client = ModrinthClient::new().map_err(|e| e.to_string())?;
-
-    let versions = client
-        .get_project_versions(&modpack_slug, None, None)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let version = versions
-        .iter()
-        .find(|v| v.id == version_id)
-        .ok_or("Version not found")?;
-
-    Ok(serde_json::json!({
-        "name": version.name,
-        "version_number": version.version_number,
-        "game_versions": version.game_versions,
-        "loaders": version.loaders,
-        "files": version.files.iter().map(|f| serde_json::json!({
-            "filename": f.filename,
-            "size": f.size,
-            "primary": f.primary
-        })).collect::<Vec<_>>()
-    }))
-}
-
-#[tauri::command]
-pub async fn get_modpack_game_versions() -> Result<Vec<String>, String> {
-    let meta_dir = get_meta_dir();
-    let installer = MinecraftInstaller::new(meta_dir).map_err(|e| e.to_string())?;
-    installer
-        .get_versions_by_type("release")
-        .await
-        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

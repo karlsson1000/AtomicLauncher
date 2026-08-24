@@ -14,19 +14,6 @@ pub async fn get_accounts() -> Result<Vec<AccountInfo>, String> {
 }
 
 #[tauri::command]
-pub async fn get_active_account() -> Result<Option<AccountInfo>, String> {
-    Ok(AccountManager::get_active_account()
-        .map_err(|e| e.to_string())?
-        .map(|account| AccountInfo {
-            uuid: account.uuid,
-            username: account.username,
-            is_active: true,
-            added_at: account.added_at,
-            last_used: account.last_used,
-        }))
-}
-
-#[tauri::command]
 pub async fn switch_account(uuid: String) -> Result<(), String> {
     crate::commands::validation::validate_uuid(&uuid)?;
     AccountManager::set_active_account(&uuid)
@@ -81,14 +68,4 @@ pub async fn microsoft_login_and_store(app_handle: tauri::AppHandle) -> Result<A
         .into_iter()
         .find(|acc| acc.uuid == auth_response.uuid)
         .ok_or_else(|| "Account not found".to_string())
-}
-
-#[tauri::command]
-pub async fn refresh_account_token(uuid: String, app_handle: tauri::AppHandle) -> Result<(), String> {
-    crate::commands::validation::validate_uuid(&uuid)?;
-    let config = app_handle.state::<AppConfig>();
-    AccountManager::get_valid_token(&uuid, &config.microsoft_client_id)
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(())
 }

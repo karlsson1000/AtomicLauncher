@@ -417,16 +417,6 @@ impl MinecraftInstaller {
 
         Ok(true)
     }
-
-    pub fn check_version_installed(&self, version: &str) -> bool {
-        let jar_path = self
-            .launcher_dir
-            .join("versions")
-            .join(version)
-            .join(format!("{}.jar", version));
-
-        jar_path.exists()
-    }
 }
 
 pub fn should_include_library(rules: &[Rule], current_os: &str) -> bool {
