@@ -56,6 +56,8 @@ pub struct FileIndex {
 #[serde(rename_all = "camelCase")]
 pub struct CurseforgeModAsset {
     pub thumbnail_url: String,
+    #[serde(default)]
+    pub download_url: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

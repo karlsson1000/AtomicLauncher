@@ -150,6 +150,48 @@ async fn download_file_verified(
     crate::utils::download::download_file_verified(url, dest, expected_sha1).await
 }
 
+async fn fetch_and_set_cf_pack_icon(
+    app_handle: &tauri::AppHandle,
+    safe_name: &str,
+    project_id: u32,
+) {
+    let _ = app_handle.emit("modpack-install-progress", serde_json::json!({
+        "instance": safe_name,
+        "progress": 98,
+        "stage": "Fetching modpack icon..."
+    }));
+
+    let Ok(api_key) = super::curseforge_api_key(app_handle) else { return };
+    let Ok(client) = CurseforgeClient::new(api_key) else { return };
+    let Ok(detail) = client.get_mod(project_id).await else { return };
+    let Some(logo) = detail.logo else { return };
+
+    for candidate in [logo.download_url.as_deref(), Some(logo.thumbnail_url.as_str())]
+        .into_iter()
+        .flatten()
+    {
+        if validate_download_url(candidate).is_err() {
+            continue;
+        }
+
+        let ext = candidate.rsplit('.').next().unwrap_or("png");
+        let icon_path = std::env::temp_dir().join(format!(
+            "cfpack_icon_{}.{}",
+            uuid::Uuid::new_v4().simple(),
+            ext
+        ));
+
+        if crate::utils::download::download_file_verified(candidate, &icon_path, None)
+            .await
+            .is_ok()
+        {
+            set_icon_from_file(safe_name, &icon_path).await;
+            let _ = std::fs::remove_file(&icon_path);
+            return;
+        }
+    }
+}
+
 async fn set_icon_from_file(safe_name: &str, icon_path: &std::path::Path) {
     let icon_path = icon_path.to_path_buf();
     if let Ok(icon_bytes) = tokio::task::spawn_blocking(move || std::fs::read(icon_path)).await
@@ -318,6 +360,7 @@ pub async fn install_modpack_from_file(
     file_path: String,
     instance_name: String,
     preferred_game_version: Option<String>,
+    project_id: Option<u32>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     use std::path::Path;
@@ -407,6 +450,7 @@ pub async fn install_modpack_from_file(
             extract_dir,
             safe_name,
             preferred_game_version,
+            project_id,
             app_handle
         ).await
     } else {
@@ -872,6 +916,7 @@ async fn install_from_curseforge_manifest(
     extract_dir: std::path::PathBuf,
     safe_name: String,
     preferred_game_version: Option<String>,
+    project_id: Option<u32>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let manifest_path = extract_dir.join("manifest.json");
@@ -1119,28 +1164,32 @@ async fn install_from_curseforge_manifest(
         }
     }
 
-    let icon_path = extract_dir.join("icon.png");
-    if icon_path.exists() {
-        set_icon_from_file(&safe_name, &icon_path).await;
-    }
-
-    let _ = std::fs::remove_dir_all(&extract_dir);
-
-    let _ = app_handle.emit("modpack-install-progress", serde_json::json!({
-        "instance": safe_name,
-        "progress": 100,
-        "stage": if failed_mods.is_empty() {
-            "Installation complete!".to_string()
-        } else {
-            format!(
-                "Completed - {} mod(s) need manual download (see Console)",
-                failed_mods.len()
-            )
+        if let Some(project_id) = project_id {
+            fetch_and_set_cf_pack_icon(&app_handle, &safe_name, project_id).await;
         }
-    }));
 
-    Ok(())
-}
+        let icon_path = extract_dir.join("icon.png");
+        if icon_path.exists() {
+            set_icon_from_file(&safe_name, &icon_path).await;
+        }
+
+        let _ = std::fs::remove_dir_all(&extract_dir);
+
+        let _ = app_handle.emit("modpack-install-progress", serde_json::json!({
+            "instance": safe_name,
+            "progress": 100,
+            "stage": if failed_mods.is_empty() {
+                "Installation complete!".to_string()
+            } else {
+                format!(
+                    "Completed - {} mod(s) need manual download (see Console)",
+                    failed_mods.len()
+                )
+            }
+        }));
+
+        Ok(())
+    }
 
 fn extract_minecraft_version_from_instance(version_string: &str) -> String {
     if version_string.contains("fabric-loader") {

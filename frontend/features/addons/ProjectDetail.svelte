@@ -237,6 +237,7 @@
           filePath,
           instanceName,
           preferredGameVersion: null,
+          projectId: curseforgeDetails?.id ?? file.modId,
         })
         if (onRefreshInstances) setTimeout(() => onRefreshInstances!(), 500)
         completedIds = new Set(completedIds).add(file.id.toString())
