@@ -94,12 +94,16 @@
     return hits
   })
 
+  let requestToken = 0
+
   async function fetchHits(offsetVal: number, replace: boolean) {
+    const token = ++requestToken
     const query = searchQuery.trim()
     if (replace) isSearching = true
     else isLoadingMore = true
     try {
       const result = await adapter.search(query, offsetVal, ITEMS_PER_PAGE)
+      if (token !== requestToken) return
       offset = offsetVal + result.hits.length
       hasMore = offsetVal + result.hits.length < result.total
       if (replace) {
@@ -112,8 +116,10 @@
     } catch (error) {
       console.error("Addon search error:", error)
     } finally {
-      if (replace) isSearching = false
-      else isLoadingMore = false
+      if (token === requestToken) {
+        if (replace) isSearching = false
+        else isLoadingMore = false
+      }
     }
   }
 

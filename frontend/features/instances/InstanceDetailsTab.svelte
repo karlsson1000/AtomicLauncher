@@ -21,6 +21,7 @@
       id: string
       downloadUrl: string
       filename: string
+      sha1: string
     }
   }
 
@@ -170,7 +171,12 @@
   }
 
   async function applyModUpdate(update: ModUpdate) {
-    await invoke("download_mod", { instanceName: instance.name, downloadUrl: update.latestVersion.downloadUrl, filename: update.latestVersion.filename })
+    await invoke("download_mod", {
+      instanceName: instance.name,
+      downloadUrl: update.latestVersion.downloadUrl,
+      filename: update.latestVersion.filename,
+      expectedSha1: update.latestVersion.sha1 ?? null,
+    })
     if (update.filename !== update.latestVersion.filename) {
       await invoke("delete_mod", { instanceName: instance.name, filename: update.filename }).catch((err: Error) =>
         console.error(`Failed to delete old version ${update.filename}:`, err)

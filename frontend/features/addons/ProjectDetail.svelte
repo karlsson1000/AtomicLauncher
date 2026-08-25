@@ -205,6 +205,7 @@
             instanceName: selectedInstance!.name,
             downloadUrl: primaryFile!.url,
             filename: primaryFile!.filename,
+            expectedSha1: primaryFile!.hashes?.sha1 ?? null,
           })
           installedFiles = new Set(installedFiles).add(primaryFile!.filename)
         }
@@ -222,11 +223,13 @@
     if (!file.downloadUrl) return
     if (!isModpack && !selectedInstance) return
     downloadingMap = new Set(downloadingMap).add(file.id.toString())
+    const expectedSha1 = file.hashes?.find(h => h.algo === 1)?.value ?? null
     try {
       if (isModpack) {
         const filePath = await invoke<string>("download_curseforge_file_temp", {
           downloadUrl: file.downloadUrl,
           filename: file.fileName,
+          expectedSha1,
         })
         const instanceName = uniqueInstanceName(curseforgeDetails?.name || file.fileName)
         onShowCreationToast?.(instanceName)
@@ -244,6 +247,7 @@
           downloadUrl: file.downloadUrl,
           filename: file.fileName,
           targetFolder,
+          expectedSha1,
         })
         installedFiles = new Set(installedFiles).add(file.fileName)
       }

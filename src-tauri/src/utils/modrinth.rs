@@ -261,20 +261,35 @@ impl ModrinthClient {
         Ok(versions)
     }
 
+    pub async fn get_version_by_id(
+        &self,
+        id_or_slug: &str,
+        version_id: &str,
+    ) -> Result<ModrinthVersion, Box<dyn std::error::Error>> {
+        let url = format!(
+            "{}/project/{}/version/{}",
+            MODRINTH_API_BASE, id_or_slug, version_id
+        );
+
+        let response = self.http_client.get(&url).send().await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            return Err(format!("Modrinth API error: {}", error_text).into());
+        }
+
+        let version: ModrinthVersion = response.json().await?;
+        Ok(version)
+    }
+
     pub async fn download_mod_file(
         &self,
         url: &str,
         destination: &std::path::Path,
+        expected_sha1: Option<&str>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let response = self.http_client.get(url).send().await?;
-
-        if !response.status().is_success() {
-            return Err(format!("Failed to download file: HTTP {}", response.status()).into());
-        }
-
-        let bytes = response.bytes().await?;
-        std::fs::write(destination, bytes)?;
-
-        Ok(())
+        crate::utils::download::download_file_verified(url, destination, expected_sha1)
+            .await
+            .map_err(|e| e.into())
     }
 }

@@ -85,11 +85,6 @@ pub struct CurseforgeModDetail {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CurseforgeGetSingleFileResult {
-    pub data: CurseforgeFile,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CurseforgeGetModFilesResult {
     pub data: Vec<CurseforgeFile>,
 }
@@ -121,9 +116,17 @@ pub struct CurseforgeFileHash {
     pub algo: u32,
 }
 
+#[derive(Clone)]
 pub struct CurseforgeClient {
     http_client: reqwest::Client,
     api_key: String,
+}
+
+pub fn extract_sha1(hashes: &[CurseforgeFileHash]) -> Option<&str> {
+    hashes
+        .iter()
+        .find(|h| h.algo == 1)
+        .map(|h| h.value.as_str())
 }
 
 impl CurseforgeClient {
@@ -194,31 +197,6 @@ impl CurseforgeClient {
         Ok(result)
     }
 
-    pub async fn get_single_mod_file(
-        &self,
-        mod_id: u32,
-        file_id: u32,
-    ) -> Result<CurseforgeFile, String> {
-        let url = format!("{}/mods/{}/files/{}", CURSEFORGE_API_BASE, mod_id, file_id);
-
-        let response = self
-            .http_client
-            .get(&url)
-            .header("x-api-key", &self.api_key)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        if !response.status().is_success() {
-            return Err(format!("CurseForge API error: {}", response.status()));
-        }
-
-        let data: CurseforgeGetSingleFileResult = response.json()
-            .await
-            .map_err(|e| e.to_string())?;
-        Ok(data.data)
-    }
-
     pub async fn get_mod_files(
         &self,
         mod_id: u32,
@@ -258,20 +236,29 @@ impl CurseforgeClient {
         Ok(result)
     }
 
-    pub async fn download_file(
+    pub async fn get_files_by_ids(
         &self,
-        url: &str,
-        destination: &std::path::Path,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let response = self.http_client.get(url).send().await?;
+        file_ids: &[u32],
+    ) -> Result<CurseforgeGetModFilesResult, Box<dyn std::error::Error>> {
+        let url = format!("{}/mods/files", CURSEFORGE_API_BASE);
+        let body = serde_json::json!({ "fileIds": file_ids });
+
+        let response = self
+            .http_client
+            .post(&url)
+            .header("x-api-key", &self.api_key)
+            .header("Accept", "application/json")
+            .json(&body)
+            .send()
+            .await?;
 
         if !response.status().is_success() {
-            return Err(format!("Failed to download file: HTTP {}", response.status()).into());
+            let error_text = response.text().await?;
+            return Err(format!("CurseForge API error: {}", error_text).into());
         }
 
-        let bytes = response.bytes().await?;
-        std::fs::write(destination, bytes)?;
-        Ok(())
+        let result: CurseforgeGetModFilesResult = response.json().await?;
+        Ok(result)
     }
 
     async fn get_mod_description(

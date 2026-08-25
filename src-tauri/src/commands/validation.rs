@@ -272,7 +272,14 @@ pub fn validate_download_url(url: &str) -> Result<url::Url, String> {
         return Err("Only HTTPS URLs are allowed".to_string());
     }
 
-    let allowed_hosts = ["cdn.modrinth.com", "github.com", "raw.githubusercontent.com", "edge.forgecdn.net"];
+    let allowed_hosts = [
+        "cdn.modrinth.com",
+        "github.com",
+        "raw.githubusercontent.com",
+        "edge.forgecdn.net",
+        "mediafilez.forgecdn.net",
+        "media.forgecdn.net",
+    ];
 
     let host = parsed_url.host_str().ok_or("URL has no host")?;
 

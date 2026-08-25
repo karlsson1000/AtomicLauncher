@@ -4,7 +4,7 @@ use crate::services::installer::MinecraftInstaller;
 use crate::services::fabric::FabricInstaller;
 use crate::utils::modrinth::ModrinthClient;
 use crate::utils::*;
-use crate::commands::validation::{sanitize_instance_name, validate_download_url};
+use crate::commands::validation::{sanitize_instance_name, sanitize_mod_filename, validate_download_url};
 use crate::utils::curseforge::CurseforgeClient;
 use tauri::Emitter;
 
@@ -45,15 +45,10 @@ pub async fn install_modpack(
     }));
 
     let client = ModrinthClient::new().map_err(|e| e.to_string())?;
-    let versions = client
-        .get_project_versions(&modpack_slug, None, None)
+    let version = client
+        .get_version_by_id(&modpack_slug, &version_id)
         .await
         .map_err(|e| e.to_string())?;
-
-    let version = versions
-        .iter()
-        .find(|v| v.id == version_id)
-        .ok_or("Version not found")?;
 
     let resolved_game_version = match &preferred_game_version {
         Some(preferred) if version.game_versions.contains(preferred) => preferred.clone(),
@@ -81,7 +76,11 @@ pub async fn install_modpack(
     validate_download_url(&primary_file.url)?;
 
     client
-        .download_mod_file(&primary_file.url, &modpack_file)
+        .download_mod_file(
+            &primary_file.url,
+            &modpack_file,
+            Some(primary_file.hashes.sha1.as_str()),
+        )
         .await
         .map_err(|e| e.to_string())?;
 
@@ -115,14 +114,12 @@ pub async fn install_modpack(
                 temp_dir.join(format!("modpack_icon_{}.{}", safe_name, icon_extension));
 
             if validate_download_url(&icon_url).is_ok()
-                && client.download_mod_file(&icon_url, &icon_path).await.is_ok()
+                && client
+                    .download_mod_file(&icon_url, &icon_path, None)
+                    .await
+                    .is_ok()
             {
-                if let Ok(icon_bytes) = std::fs::read(&icon_path) {
-                    use base64::{Engine as _, engine::general_purpose};
-                    let icon_base64 = general_purpose::STANDARD.encode(&icon_bytes);
-                    let _ =
-                        crate::commands::set_instance_icon(safe_name.clone(), icon_base64).await;
-                }
+                set_icon_from_file(&safe_name, &icon_path).await;
                 let _ = std::fs::remove_file(&icon_path);
             }
         }
@@ -150,27 +147,18 @@ async fn download_file_verified(
     dest: &std::path::Path,
     expected_sha1: Option<&str>,
 ) -> Result<(), String> {
-    use sha1::{Digest, Sha1};
+    crate::utils::download::download_file_verified(url, dest, expected_sha1).await
+}
 
-    let client = crate::utils::http::get_client();
-    let response = client.get(url).send().await.map_err(|e| e.to_string())?;
-    if !response.status().is_success() {
-        return Err(format!("HTTP {}", response.status()));
+async fn set_icon_from_file(safe_name: &str, icon_path: &std::path::Path) {
+    let icon_path = icon_path.to_path_buf();
+    if let Ok(icon_bytes) = tokio::task::spawn_blocking(move || std::fs::read(icon_path)).await
+        .unwrap_or(Err(std::io::Error::new(std::io::ErrorKind::Other, "join failed")))
+    {
+        use base64::{Engine as _, engine::general_purpose};
+        let icon_base64 = general_purpose::STANDARD.encode(&icon_bytes);
+        let _ = crate::commands::set_instance_icon(safe_name.to_string(), icon_base64).await;
     }
-
-    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
-
-    if let Some(expected) = expected_sha1 {
-        let mut hasher = Sha1::new();
-        hasher.update(&bytes);
-        if format!("{:x}", hasher.finalize()) != expected {
-            return Err("sha1 verification failed".to_string());
-        }
-    }
-
-    std::fs::write(dest, &bytes).map_err(|e| e.to_string())?;
-
-    Ok(())
 }
 
 fn copy_dir_recursive(
@@ -617,11 +605,7 @@ async fn install_from_mrpack(
 
     let icon_path = extract_dir.join("icon.png");
     if icon_path.exists() {
-        if let Ok(icon_bytes) = std::fs::read(&icon_path) {
-            use base64::{Engine as _, engine::general_purpose};
-            let icon_base64 = general_purpose::STANDARD.encode(&icon_bytes);
-            let _ = crate::commands::set_instance_icon(safe_name.clone(), icon_base64).await;
-        }
+        set_icon_from_file(&safe_name, &icon_path).await;
     }
 
     let instance_dir = get_instance_dir(&safe_name);
@@ -870,11 +854,7 @@ async fn install_from_standard_zip(
 
     let icon_path = extract_dir.join("icon.png");
     if icon_path.exists() {
-        if let Ok(icon_bytes) = std::fs::read(&icon_path) {
-            use base64::{Engine as _, engine::general_purpose};
-            let icon_base64 = general_purpose::STANDARD.encode(&icon_bytes);
-            let _ = crate::commands::set_instance_icon(safe_name.clone(), icon_base64).await;
-        }
+        set_icon_from_file(&safe_name, &icon_path).await;
     }
 
     let _ = std::fs::remove_dir_all(&extract_dir);
@@ -999,41 +979,118 @@ async fn install_from_curseforge_manifest(
             std::fs::create_dir_all(&mods_dir)
                 .map_err(|e| e.to_string())?;
 
-            for (idx, &(_file_entry, project_id, file_id)) in curseforge_files.iter().enumerate() {
-                let _ = app_handle.emit("modpack-install-progress", serde_json::json!({
-                    "instance": safe_name,
-                    "progress": 70 + ((idx + 1) * 25 / total_files) as u32,
-                    "stage": format!("Downloading mods... ({}/{})", idx + 1, total_files)
-                }));
+            let mut resolved: std::collections::HashMap<(u32, u32), crate::utils::curseforge::CurseforgeFile> =
+                std::collections::HashMap::new();
+            let file_ids: Vec<u32> = curseforge_files.iter().map(|&(_, _, fid)| fid).collect();
+            for chunk in file_ids.chunks(100) {
+                match cf_client.get_files_by_ids(chunk).await {
+                    Ok(result) => {
+                        for f in result.data {
+                            resolved.insert((f.mod_id, f.id), f);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to batch-resolve CurseForge files: {}", e);
+                    }
+                }
+            }
 
-                match cf_client.get_single_mod_file(project_id, file_id).await {
-                    Ok(cf_file) => match cf_file.download_url {
+            struct PendingCfDownload {
+                url: String,
+                dest_path: std::path::PathBuf,
+                label: String,
+                expected_sha1: Option<String>,
+            }
+
+            let mut pending: Vec<PendingCfDownload> = Vec::new();
+            for &(_file_entry, project_id, file_id) in curseforge_files.iter() {
+                match resolved.get(&(project_id, file_id)) {
+                    Some(cf_file) => match cf_file.download_url.clone() {
                         Some(download_url) => {
-                            let dest_path = mods_dir.join(&cf_file.file_name);
-
-                            if let Some(parent) = dest_path.parent() {
-                                let _ = std::fs::create_dir_all(parent);
+                            let safe_filename = match sanitize_mod_filename(&cf_file.file_name) {
+                                Ok(f) => f,
+                                Err(e) => {
+                                    failed_mods.push(format!("{} (unsafe filename: {})", cf_file.file_name, e));
+                                    continue;
+                                }
+                            };
+                            let dest_path = mods_dir.join(&safe_filename);
+                            if !dest_path.starts_with(&mods_dir) {
+                                failed_mods.push(format!("{} (unsafe path)", cf_file.file_name));
+                                continue;
                             }
 
-                            if let Err(e) = cf_client.download_file(&download_url, &dest_path).await
-                            {
-                                eprintln!("Failed to download {}: {}", cf_file.file_name, e);
-                                failed_mods.push(cf_file.file_name.clone());
-                            }
+                            pending.push(PendingCfDownload {
+                                url: download_url,
+                                dest_path,
+                                label: cf_file.file_name.clone(),
+                                expected_sha1: crate::utils::curseforge::extract_sha1(&cf_file.hashes).map(String::from),
+                            });
                         }
                         None => {
-                                failed_mods.push(format!(
+                            failed_mods.push(format!(
                                 "{} (blocked from third-party downloads)",
                                 cf_file.file_name
                             ));
                         }
                     },
-                    Err(e) => {
-                        eprintln!("Failed to fetch mod {} file {}: {}", project_id, file_id, e);
+                    None => {
                         failed_mods.push(format!(
                             "CurseForge project {} file {} (could not be resolved)",
                             project_id, file_id
                         ));
+                    }
+                }
+            }
+
+            if !pending.is_empty() {
+                const MAX_CONCURRENT_CF_DOWNLOADS: usize = 16;
+
+                let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(MAX_CONCURRENT_CF_DOWNLOADS));
+                let completed = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+
+                let mut handles = Vec::new();
+                for entry in pending {
+                    let permit = semaphore
+                        .clone()
+                        .acquire_owned()
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    let app_handle = app_handle.clone();
+                    let safe_name = safe_name.clone();
+                    let completed = completed.clone();
+
+                    handles.push(tokio::spawn(async move {
+                        let result = download_file_verified(
+                            &entry.url,
+                            &entry.dest_path,
+                            entry.expected_sha1.as_deref(),
+                        )
+                        .await;
+
+                        let done = completed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                        let _ = app_handle.emit("modpack-install-progress", serde_json::json!({
+                            "instance": safe_name,
+                            "progress": 70 + (done * 25 / total_files) as u32,
+                            "stage": format!("Downloading mods... ({}/{})", done, total_files)
+                        }));
+
+                        drop(permit);
+                        match result {
+                            Ok(()) => None,
+                            Err(e) => {
+                                eprintln!("Failed to download {}: {}", entry.label, e);
+                                Some(entry.label)
+                            }
+                        }
+                    }));
+                }
+
+                for handle in handles {
+                    match handle.await {
+                        Ok(Some(label)) => failed_mods.push(label),
+                        Ok(None) => {}
+                        Err(e) => eprintln!("CurseForge download task panicked: {}", e),
                     }
                 }
             }
@@ -1064,11 +1121,7 @@ async fn install_from_curseforge_manifest(
 
     let icon_path = extract_dir.join("icon.png");
     if icon_path.exists() {
-        if let Ok(icon_bytes) = std::fs::read(&icon_path) {
-            use base64::{Engine as _, engine::general_purpose};
-            let icon_base64 = general_purpose::STANDARD.encode(&icon_bytes);
-            let _ = crate::commands::set_instance_icon(safe_name.clone(), icon_base64).await;
-        }
+        set_icon_from_file(&safe_name, &icon_path).await;
     }
 
     let _ = std::fs::remove_dir_all(&extract_dir);

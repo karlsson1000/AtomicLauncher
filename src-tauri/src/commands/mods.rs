@@ -12,12 +12,16 @@ fn cache_path(instance_dir: &std::path::Path) -> std::path::PathBuf {
     instance_dir.join(".mod_cache.json")
 }
 
-fn invalidate_mod_cache(instance_name: &str) {
+pub(crate) fn invalidate_content_cache(instance_name: &str, cache_kind: &str) {
     let instance_dir = get_instance_dir(instance_name);
-    let path = cache_path(&instance_dir);
+    let path = instance_dir.join(format!(".{}_cache.json", cache_kind));
     if path.exists() {
         let _ = std::fs::remove_file(&path);
     }
+}
+
+fn invalidate_mod_cache(instance_name: &str) {
+    invalidate_content_cache(instance_name, "mod");
 }
 
 #[derive(Serialize, Deserialize)]
@@ -103,6 +107,42 @@ pub async fn get_installed_mods(instance_name: String) -> Result<Vec<ModFile>, S
 }
 
 #[tauri::command]
+pub(crate) fn delete_content_file(
+    safe_name: &str,
+    folder: &str,
+    cache_kind: &str,
+    safe_filename: &str,
+    label: &str,
+) -> Result<(), String> {
+    let instance_dir = get_instance_dir(safe_name);
+    let content_dir = instance_dir.join(folder);
+    let file_path = content_dir.join(safe_filename);
+
+    let canonical_file_path = file_path
+        .canonicalize()
+        .map_err(|_| format!("{} '{}' not found", label, safe_filename))?;
+
+    let canonical_content_dir = content_dir
+        .canonicalize()
+        .map_err(|_| format!("{} directory not found", label))?;
+
+    if !canonical_file_path.starts_with(&canonical_content_dir) {
+        return Err(format!("Invalid {} path", label.to_lowercase()));
+    }
+
+    if !canonical_file_path.is_file() {
+        return Err(format!("{} '{}' not found", label, safe_filename));
+    }
+
+    std::fs::remove_file(&canonical_file_path)
+        .map_err(|e| e.to_string())?;
+
+    invalidate_content_cache(safe_name, cache_kind);
+
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn delete_mod(instance_name: String, filename: String) -> Result<(), String> {
     let safe_name = sanitize_instance_name(&instance_name)?;
     let safe_filename = if filename.ends_with(".disabled") {
@@ -111,31 +151,8 @@ pub async fn delete_mod(instance_name: String, filename: String) -> Result<(), S
     } else {
         sanitize_mod_filename(&filename)?
     };
-    
-    let instance_dir = get_instance_dir(&safe_name);
-    let mods_dir = instance_dir.join("mods");
-    let mod_path = mods_dir.join(&safe_filename);
-    
-    let canonical_mod_path = mod_path.canonicalize()
-        .map_err(|_| format!("Mod file '{}' not found", safe_filename))?;
-    
-    let canonical_mods_dir = mods_dir.canonicalize()
-        .map_err(|_| "Mods directory not found".to_string())?;
-    
-    if !canonical_mod_path.starts_with(&canonical_mods_dir) {
-        return Err("Invalid mod path".to_string());
-    }
-    
-    if !canonical_mod_path.is_file() {
-        return Err(format!("Mod file '{}' not found", safe_filename));
-    }
-    
-    std::fs::remove_file(&canonical_mod_path)
-        .map_err(|e| e.to_string())?;
 
-    invalidate_mod_cache(&safe_name);
-
-    Ok(())
+    delete_content_file(&safe_name, "mods", "mod", &safe_filename, "Mod file")
 }
 
 fn collect_mod_hashes(instance_dir: &std::path::Path) -> Result<Vec<ModHash>, String> {
@@ -232,15 +249,25 @@ fn save_cache(instance_dir: &std::path::Path, cache: &HashMap<String, CacheEntry
 
 #[tauri::command]
 pub async fn get_installed_mods_with_metadata(instance_name: String) -> Result<Vec<ModFileWithMetadata>, String> {
+    get_installed_content_with_metadata(instance_name, "mods", "mod", &[".jar", ".jar.disabled"], true).await
+}
+
+pub(crate) async fn get_installed_content_with_metadata(
+    instance_name: String,
+    folder: &str,
+    cache_kind: &str,
+    allowed_extensions: &[&str],
+    supports_disabled: bool,
+) -> Result<Vec<ModFileWithMetadata>, String> {
     let safe_name = sanitize_instance_name(&instance_name)?;
     let instance_dir = get_instance_dir(&safe_name);
-    let mods_dir = instance_dir.join("mods");
+    let content_dir = instance_dir.join(folder);
 
-    if !mods_dir.exists() {
+    if !content_dir.exists() {
         return Ok(Vec::new());
     }
 
-    let cache_file = cache_path(&instance_dir);
+    let cache_file = instance_dir.join(format!(".{}_cache.json", cache_kind));
     let mut disk_cache: HashMap<String, CacheEntry> = if cache_file.exists() {
         std::fs::read_to_string(&cache_file)
             .ok()
@@ -250,16 +277,16 @@ pub async fn get_installed_mods_with_metadata(instance_name: String) -> Result<V
         HashMap::new()
     };
 
-    let mut mods = Vec::new();
+    let mut items = Vec::new();
     let mut hashes_needing_metadata: Vec<String> = Vec::new();
 
-    for entry in std::fs::read_dir(&mods_dir).map_err(|e| e.to_string())? {
+    for entry in std::fs::read_dir(&content_dir).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
         if !path.is_file() { continue; }
 
         let filename = match path.file_name().and_then(|n| n.to_str()) {
-            Some(f) if f.ends_with(".jar") || f.ends_with(".jar.disabled") => f.to_string(),
+            Some(f) if allowed_extensions.iter().any(|ext| f.ends_with(ext)) => f.to_string(),
             _ => continue,
         };
 
@@ -274,7 +301,7 @@ pub async fn get_installed_mods_with_metadata(instance_name: String) -> Result<V
             .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
             .map(|d| d.as_nanos())
             .unwrap_or(0);
-        let disabled = filename.ends_with(".disabled");
+        let disabled = supports_disabled && filename.ends_with(".disabled");
 
         let (_, metadata) = match disk_cache.get(&filename) {
             Some(entry) if entry.mtime == mtime && entry.size == size => {
@@ -299,7 +326,7 @@ pub async fn get_installed_mods_with_metadata(instance_name: String) -> Result<V
             }
         };
 
-        mods.push(ModFileWithMetadata {
+        items.push(ModFileWithMetadata {
             filename: filename.clone(),
             size,
             project_id: metadata.as_ref().and_then(|m| m.project_id.clone()),
@@ -311,82 +338,99 @@ pub async fn get_installed_mods_with_metadata(instance_name: String) -> Result<V
             disabled,
             current_version_id: metadata.as_ref().and_then(|m| m.current_version_id.clone()),
         });
-
     }
-
 
     if !hashes_needing_metadata.is_empty() {
-        let client = ModrinthClient::new().map_err(|e| e.to_string())?;
-        let mut project_ids: Vec<String> = Vec::new();
-        let mut hash_to_version_and_project: HashMap<String, (String, String)> = HashMap::new();
-
-        for chunk in hashes_needing_metadata.chunks(100) {
-            if let Ok(version_files) = client.get_version_files_by_hashes(chunk).await {
-                for (hash, vf) in &version_files {
-                    hash_to_version_and_project.insert(hash.clone(), (vf.project_id.clone(), vf.id.clone()));
-                    if !project_ids.contains(&vf.project_id) {
-                        project_ids.push(vf.project_id.clone());
-                    }
+        match enrich_with_modrinth_metadata(&mut disk_cache, &mut items, &mut hashes_needing_metadata).await {
+            Ok(()) => {
+                if let Ok(json) = serde_json::to_string(&disk_cache) {
+                    let _ = std::fs::write(&cache_file, json);
                 }
             }
-        }
-
-        if !project_ids.is_empty() {
-            if let Ok(projects) = client.get_projects_batch(&project_ids).await {
-                let project_map: HashMap<String, ModrinthProjectDetails> =
-                    projects.into_iter().map(|p| (p.id.clone(), p)).collect();
-
-                for (hash, (proj_id, version_id)) in &hash_to_version_and_project {
-                    if let Some(project) = project_map.get(proj_id) {
-                        let metadata = ModFileWithMetadata {
-                            filename: String::new(),
-                            size: 0,
-                            project_id: Some(proj_id.clone()),
-                            name: Some(project.title.clone()),
-                            description: Some(project.description.clone()),
-                            icon_url: project.icon_url.clone(),
-                            author: None,
-                            downloads: Some(project.downloads),
-                            disabled: false,
-                            current_version_id: Some(version_id.clone()),
-                        };
-
-                        for entry in disk_cache.values_mut() {
-                            if entry.sha1_hash == *hash {
-                                entry.metadata = Some(ModFileWithMetadata {
-                                    filename: String::new(),
-                                    size: entry.size,
-                                    ..metadata.clone()
-                                });
-                            }
-                        }
-
-                        for mod_entry in mods.iter_mut() {
-                            if disk_cache.get(&mod_entry.filename)
-                                .map(|e| e.sha1_hash == *hash)
-                                .unwrap_or(false)
-                            {
-                                mod_entry.project_id = Some(proj_id.clone());
-                                mod_entry.name = Some(project.title.clone());
-                                mod_entry.description = Some(project.description.clone());
-                                mod_entry.icon_url = project.icon_url.clone();
-                                mod_entry.author = None;
-                                mod_entry.downloads = Some(project.downloads);
-                                mod_entry.current_version_id = Some(version_id.clone());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if let Ok(json) = serde_json::to_string(&disk_cache) {
-            let _ = std::fs::write(&cache_file, json);
+            Err(e) => eprintln!("Failed to fetch Modrinth metadata for {} items: {}", hashes_needing_metadata.len(), e),
         }
     }
 
-    mods.sort_by(|a, b| a.filename.to_lowercase().cmp(&b.filename.to_lowercase()));
-    Ok(mods)
+    items.sort_by(|a, b| a.filename.to_lowercase().cmp(&b.filename.to_lowercase()));
+    Ok(items)
+}
+
+async fn enrich_with_modrinth_metadata(
+    disk_cache: &mut HashMap<String, CacheEntry>,
+    items: &mut [ModFileWithMetadata],
+    hashes_needing_metadata: &mut [String],
+) -> Result<(), String> {
+    let client = ModrinthClient::new().map_err(|e| e.to_string())?;
+    let mut project_ids: Vec<String> = Vec::new();
+    let mut hash_to_version_and_project: HashMap<String, (String, String)> = HashMap::new();
+
+    for chunk in hashes_needing_metadata.chunks(100) {
+        let version_files = client
+            .get_version_files_by_hashes(chunk)
+            .await
+            .map_err(|e| e.to_string())?;
+        for (hash, vf) in &version_files {
+            hash_to_version_and_project.insert(hash.clone(), (vf.project_id.clone(), vf.id.clone()));
+            if !project_ids.contains(&vf.project_id) {
+                project_ids.push(vf.project_id.clone());
+            }
+        }
+    }
+
+    if project_ids.is_empty() {
+        return Ok(());
+    }
+
+    let projects = client
+        .get_projects_batch(&project_ids)
+        .await
+        .map_err(|e| e.to_string())?;
+    let project_map: HashMap<String, ModrinthProjectDetails> =
+        projects.into_iter().map(|p| (p.id.clone(), p)).collect();
+
+    for (hash, (proj_id, version_id)) in &hash_to_version_and_project {
+        if let Some(project) = project_map.get(proj_id) {
+            let metadata = ModFileWithMetadata {
+                filename: String::new(),
+                size: 0,
+                project_id: Some(proj_id.clone()),
+                name: Some(project.title.clone()),
+                description: Some(project.description.clone()),
+                icon_url: project.icon_url.clone(),
+                author: None,
+                downloads: Some(project.downloads),
+                disabled: false,
+                current_version_id: Some(version_id.clone()),
+            };
+
+            for entry in disk_cache.values_mut() {
+                if entry.sha1_hash == *hash {
+                    entry.metadata = Some(ModFileWithMetadata {
+                        filename: String::new(),
+                        size: entry.size,
+                        ..metadata.clone()
+                    });
+                }
+            }
+
+            for item in items.iter_mut() {
+                if disk_cache.get(&item.filename)
+                    .map(|e| e.sha1_hash == *hash)
+                    .unwrap_or(false)
+                {
+                    item.project_id = Some(proj_id.clone());
+                    item.name = Some(project.title.clone());
+                    item.description = Some(project.description.clone());
+                    item.icon_url = project.icon_url.clone();
+                    item.author = None;
+                    item.downloads = Some(project.downloads);
+                    item.current_version_id = Some(version_id.clone());
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -528,6 +572,8 @@ pub struct LatestVersionInfo {
     #[serde(rename = "downloadUrl")]
     pub download_url: String,
     pub filename: String,
+    #[serde(rename = "sha1")]
+    pub sha1: String,
 }
 
 #[tauri::command]
@@ -576,6 +622,7 @@ pub async fn check_mod_updates(
                 id: resp.id.clone(),
                 download_url: file.url.clone(),
                 filename: file.filename.clone(),
+                sha1: file.hashes.sha1.clone(),
             },
         });
     }
@@ -583,35 +630,47 @@ pub async fn check_mod_updates(
     Ok(updates)
 }
 
-#[tauri::command]
-pub async fn download_mod(
-    instance_name: String,
-    download_url: String,
-    filename: String,
+pub(crate) async fn download_into_content_dir(
+    safe_name: &str,
+    folder: &str,
+    download_url: &str,
+    safe_filename: &str,
+    expected_sha1: Option<&str>,
 ) -> Result<(), String> {
-    let safe_name = sanitize_instance_name(&instance_name)?;
-    let safe_filename = sanitize_mod_filename(&filename)?;
-    let _ = validate_download_url(&download_url)?;
-    
-    let instance_dir = get_instance_dir(&safe_name);
-    let mods_dir = instance_dir.join("mods");
+    let _ = validate_download_url(download_url)?;
 
-    if !mods_dir.exists() {
-        std::fs::create_dir_all(&mods_dir)
+    let instance_dir = get_instance_dir(safe_name);
+    let content_dir = instance_dir.join(folder);
+
+    if !content_dir.exists() {
+        std::fs::create_dir_all(&content_dir)
             .map_err(|e| e.to_string())?;
     }
 
-    let destination = mods_dir.join(&safe_filename);
-    
-    if !destination.starts_with(&mods_dir) {
+    let destination = content_dir.join(safe_filename);
+
+    if !destination.starts_with(&content_dir) {
         return Err("Invalid destination path".to_string());
     }
 
     let client = ModrinthClient::new().map_err(|e| e.to_string())?;
     client
-        .download_mod_file(&download_url, &destination)
+        .download_mod_file(download_url, &destination, expected_sha1)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn download_mod(
+    instance_name: String,
+    download_url: String,
+    filename: String,
+    expected_sha1: Option<String>,
+) -> Result<(), String> {
+    let safe_name = sanitize_instance_name(&instance_name)?;
+    let safe_filename = sanitize_mod_filename(&filename)?;
+
+    download_into_content_dir(&safe_name, "mods", &download_url, &safe_filename, expected_sha1.as_deref()).await
 }
 
 // CurseForge
@@ -678,33 +737,34 @@ pub async fn get_curseforge_mod_files(
 
 #[tauri::command]
 pub async fn download_curseforge_file_temp(
-    app_handle: tauri::AppHandle,
     download_url: String,
     filename: String,
+    expected_sha1: Option<String>,
 ) -> Result<String, String> {
     let safe_filename = sanitize_filename(&filename)?;
+    let _ = validate_download_url(&download_url)?;
 
     let temp_dir = std::env::temp_dir().join("octane_curseforge");
     std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
 
     let destination = temp_dir.join(&safe_filename);
-    let api_key = curseforge_api_key(&app_handle)?;
-    let client = CurseforgeClient::new(api_key).map_err(|e| e.to_string())?;
-    client
-        .download_file(&download_url, &destination)
-        .await
-        .map_err(|e| e.to_string())?;
+    crate::utils::download::download_file_verified(
+        &download_url,
+        &destination,
+        expected_sha1.as_deref(),
+    )
+    .await?;
 
     Ok(destination.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 pub async fn download_curseforge_file(
-    app_handle: tauri::AppHandle,
     instance_name: String,
     download_url: String,
     filename: String,
     target_folder: String,
+    expected_sha1: Option<String>,
 ) -> Result<(), String> {
     let safe_name = sanitize_instance_name(&instance_name)?;
     let safe_filename = match target_folder.as_str() {
@@ -713,28 +773,17 @@ pub async fn download_curseforge_file(
         "shaderpacks" => sanitize_shaderpack_filename(&filename)?,
         _ => return Err("Invalid target folder".to_string()),
     };
-    let _ = validate_download_url(&download_url)?;
 
-    let instance_dir = get_instance_dir(&safe_name);
-    let target_dir = instance_dir.join(&target_folder);
+    crate::commands::mods::download_into_content_dir(
+        &safe_name,
+        &target_folder,
+        &download_url,
+        &safe_filename,
+        expected_sha1.as_deref(),
+    )
+    .await?;
 
-    if !target_dir.exists() {
-        std::fs::create_dir_all(&target_dir)
-            .map_err(|e| e.to_string())?;
-    }
-
-    let destination = target_dir.join(&safe_filename);
-
-    if !destination.starts_with(&target_dir) {
-        return Err("Invalid destination path".to_string());
-    }
-
-    let api_key = curseforge_api_key(&app_handle)?;
-    let client = CurseforgeClient::new(api_key).map_err(|e| e.to_string())?;
-    client
-        .download_file(&download_url, &destination)
-        .await
-        .map_err(|e| e.to_string())
+    Ok(())
 }
 
 #[tauri::command]
