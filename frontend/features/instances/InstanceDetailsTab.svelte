@@ -49,6 +49,8 @@
   let isSettingsOpen = $state(false)
   let availableUpdates = $state<ModUpdate[]>([])
   let isCheckingUpdates = $state(false)
+  let allModsUpToDate = $state(false)
+  let upToDateTimer: ReturnType<typeof setTimeout> | undefined
   let isUpdatingMods = $state(false)
   let modSearchQuery = $state("")
   let worldSearchQuery = $state("")
@@ -82,6 +84,8 @@
 
   $effect(() => {
     void instance.name
+    allModsUpToDate = false
+    if (upToDateTimer) clearTimeout(upToDateTimer)
     loadInstalledMods()
     loadWorlds()
     loadResourcePacks()
@@ -155,6 +159,8 @@
     if (!instance || (instance.loader !== "fabric" && instance.loader !== "neoforge" && instance.loader !== "forge")) return
 
     isCheckingUpdates = true
+    allModsUpToDate = false
+    if (upToDateTimer) clearTimeout(upToDateTimer)
 
     try {
       availableUpdates = await invoke<ModUpdate[]>("check_mod_updates", {
@@ -162,6 +168,10 @@
         loader: instance.loader,
         gameVersion: getMinecraftVersion(instance),
       })
+      if (availableUpdates.length === 0) {
+        allModsUpToDate = true
+        upToDateTimer = setTimeout(() => (allModsUpToDate = false), 3000)
+      }
     } catch (error) {
       console.error("Failed to check for updates:", error)
       alertModal = { isOpen: true, title: "Error", message: `Failed to check for updates: ${String(error)}`, type: "danger" }
@@ -513,9 +523,11 @@
                       {/if}
                     </button>
                   {:else}
-                    <button onclick={checkForUpdates} disabled={isCheckingUpdates} class="flex items-center gap-1.5 px-2 py-0.5 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover-strong)] disabled:opacity-50 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded text-xs transition-colors cursor-pointer">
+                    <button onclick={checkForUpdates} disabled={isCheckingUpdates} class="flex items-center gap-1.5 px-2 py-0.5 {allModsUpToDate ? 'bg-[#16a34a] hover:bg-[#15803d] text-white' : 'bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover-strong)] disabled:opacity-50 text-[var(--text-muted)] hover:text-[var(--text-primary)]'} rounded text-xs font-medium transition-colors cursor-pointer">
                       {#if isCheckingUpdates}
                         <Loader2 size={14} class="animate-spin" /><span>Checking...</span>
+                      {:else if allModsUpToDate}
+                        <Check size={14} strokeWidth={3} /><span>All mods up to date</span>
                       {:else}
                         <RefreshCw size={14} /><span>Check for Updates</span>
                       {/if}
