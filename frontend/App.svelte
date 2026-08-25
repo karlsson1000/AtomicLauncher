@@ -27,6 +27,7 @@
     setExportModal, setShowSearchPalette,
   } from "./lib/launcherStore.svelte"
   import { onMount, untrack } from "svelte"
+  import { invoke } from "@tauri-apps/api/core"
 
   function handleGlobalKeydown(e: KeyboardEvent) {
     const key = e.key.toLowerCase()
@@ -51,6 +52,7 @@
   })
 
   onMount(() => {
+    invoke("show_window").catch(() => {})
     setTimeout(async () => {
       store.isReady = true
       const splash = document.getElementById("splash-screen")
