@@ -1,7 +1,7 @@
 use crate::models::NeoForgeVersion;
+use crate::services::loader_common;
 use std::path::PathBuf;
 use serde::Deserialize;
-use std::process::{Command, Stdio};
 
 
 const NEOFORGE_META_URL: &str = "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge";
@@ -136,146 +136,52 @@ impl NeoForgeInstaller {
         Ok(compatible.neoforge_version.clone())
     }
 
-    fn ensure_launcher_profile(&self) -> Result<(), NeoForgeError> {
-        let launcher_profiles_path = self.meta_dir.join("launcher_profiles.json");
-        
-        if !launcher_profiles_path.exists() {
-            let minimal_profile = serde_json::json!({
-                "profiles": {},
-                "settings": {
-                    "enableSnapshots": false,
-                    "enableAdvanced": false,
-                    "crashAssistance": true,
-                    "enableHistorical": false,
-                    "enableReleases": true,
-                    "keepLauncherOpen": false,
-                    "showGameLog": false,
-                    "showMenu": false,
-                    "soundOn": false
-                },
-                "version": 3
-            });
-            
-            std::fs::write(
-                &launcher_profiles_path,
-                serde_json::to_string_pretty(&minimal_profile)?
-            )?;
-        }
-        
-        Ok(())
-    }
-
-    fn cleanup_install_logs(&self, full_version: &str) {
-        // Clean up common installer log files
-        let log_patterns: Vec<String> = vec![
-            "installer.log".to_string(),
-            "install.log".to_string(),
-            "neoforge_installer.log".to_string(),
-            format!("neoforge-{}-installer.jar.log", full_version),
-        ];
-
-        // Directories to check for log files
-        let search_dirs = vec![
-            self.meta_dir.clone(),
-            std::env::temp_dir(),
-            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")),
-        ];
-
-        // Check all patterns in all directories
-        for dir in &search_dirs {
-            for pattern in &log_patterns {
-                let log_path = dir.join(pattern);
-                if log_path.exists() {
-                    let _ = std::fs::remove_file(&log_path);
-                }
-            }
-        }
-
-        // Clean up any neoforge-specific log files in all directories
-        for dir in &search_dirs {
-            if let Ok(entries) = std::fs::read_dir(dir) {
-                for entry in entries.flatten() {
-                    if let Ok(file_name) = entry.file_name().into_string() {
-                        if file_name.contains("neoforge") && file_name.ends_with(".log") {
-                            let _ = std::fs::remove_file(entry.path());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     pub async fn install_neoforge(
         &self,
         neoforge_version: &str,
     ) -> Result<String, NeoForgeError> {
-        self.ensure_launcher_profile()?;
-        
+        loader_common::ensure_launcher_profile(&self.meta_dir)
+            .map_err(|e| -> NeoForgeError { e.into() })?;
+
         let full_version = neoforge_version.to_string();
-        
+
         let version_id = format!("neoforge-{}", full_version);
-        
-        // Check if already installed
+
         let version_dir = self.meta_dir.join("versions").join(&version_id);
         let json_path = version_dir.join(format!("{}.json", version_id));
-        
+
         if json_path.exists() {
             return Ok(version_id);
         }
-        
+
         let installer_url = format!(
             "{}/net/neoforged/neoforge/{}/neoforge-{}-installer.jar",
             NEOFORGE_MAVEN_URL, full_version, full_version
         );
 
         let installer_response = self.http_client.get(&installer_url).send().await?;
-        
+
         if !installer_response.status().is_success() {
             return Err(format!("Failed to download NeoForge installer: HTTP {}", installer_response.status()).into());
         }
-        
+
         let installer_bytes = installer_response.bytes().await?;
+        let installer_path = loader_common::unique_installer_jar("neoforge", &full_version);
+        std::fs::write(&installer_path, &installer_bytes)?;
 
-        let temp_dir = std::env::temp_dir();
-        let installer_path = temp_dir.join(format!("neoforge-{}-installer.jar", full_version));
-        std::fs::write(&installer_path, installer_bytes)?;
-
-        let mut cmd = Command::new("java");
-        cmd.arg("-jar")
-            .arg(&installer_path)
-            .arg("--installClient")
-            .arg(&self.meta_dir)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-
-        #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            const CREATE_NO_WINDOW: u32 = 0x08000000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
-        }
-
-        let child = cmd.spawn()?;
-        
-        let output = child.wait_with_output()?;
+        let meta_dir = self.meta_dir.clone();
+        let (success, stdout, stderr) =
+            loader_common::run_installer_jvm(installer_path.clone(), meta_dir).await?;
 
         let _ = std::fs::remove_file(&installer_path);
+        loader_common::cleanup_install_logs(&self.meta_dir, "neoforge", &full_version);
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            
-            // Clean up logs even on failure
-            self.cleanup_install_logs(&full_version);
-            
+        if !success {
             return Err(format!(
                 "NeoForge installer failed!\nStdout: {}\nStderr: {}",
                 stdout, stderr
             ).into());
         }
-
-        // Clean up installer logs after successful installation
-        self.cleanup_install_logs(&full_version);
 
         if !json_path.exists() {
             return Err(format!(

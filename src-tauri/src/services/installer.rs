@@ -24,35 +24,8 @@ impl MinecraftInstaller {
 
     // Ensure launcher_profiles.json exists
     fn ensure_launcher_profile(&self) -> Result<(), DownloadError> {
-        let launcher_profiles_path = self.launcher_dir.join("launcher_profiles.json");
-        
-        // Only create if it doesn't exist
-        if !launcher_profiles_path.exists() {
-            fs::create_dir_all(&self.launcher_dir)?;
-            
-            let minimal_profile = serde_json::json!({
-                "profiles": {},
-                "settings": {
-                    "enableSnapshots": false,
-                    "enableAdvanced": false,
-                    "crashAssistance": true,
-                    "enableHistorical": false,
-                    "enableReleases": true,
-                    "keepLauncherOpen": false,
-                    "showGameLog": false,
-                    "showMenu": false,
-                    "soundOn": false
-                },
-                "version": 3
-            });
-            
-            fs::write(
-                &launcher_profiles_path,
-                serde_json::to_string_pretty(&minimal_profile)?
-            )?;
-        }
-        
-        Ok(())
+        crate::services::loader_common::ensure_launcher_profile(&self.launcher_dir)
+            .map_err(|e| -> DownloadError { e.into() })
     }
 
     async fn download_file(
@@ -239,8 +212,10 @@ impl MinecraftInstaller {
                 };
                 
                 if platform_suffix == current_os {
+                    let mut queued_from_artifact = false;
                     if let Some(downloads) = &library.downloads {
                         if let Some(artifact) = &downloads.artifact {
+                            queued_from_artifact = true;
                             native_count += 1;
                             library_tasks.push((
                                 artifact.url.clone(),
@@ -249,15 +224,14 @@ impl MinecraftInstaller {
                             ));
                         }
                     }
-                    if native_count > 0 {
-                        continue;
-                    }
-                    let path = library_maven_path(&libraries_dir, &library.name);
-                    if Self::file_needs_download(&path, None) {
-                        let url = library_maven_url(&library.name);
-                        if !url.is_empty() {
-                            native_count += 1;
-                            library_tasks.push((url, path, String::new()));
+                    if !queued_from_artifact {
+                        let path = library_maven_path(&libraries_dir, &library.name);
+                        if Self::file_needs_download(&path, None) {
+                            let url = library_maven_url(&library.name);
+                            if !url.is_empty() {
+                                native_count += 1;
+                                library_tasks.push((url, path, String::new()));
+                            }
                         }
                     }
                 }
@@ -340,8 +314,12 @@ impl MinecraftInstaller {
 
         let mut asset_tasks = Vec::new();
         for (_, asset) in asset_index_data.objects {
-            let hash_prefix = &asset.hash[0..2];
-            let asset_path = objects_dir.join(hash_prefix).join(&asset.hash);
+            let hash_prefix = asset
+                .hash
+                .get(0..2)
+                .ok_or_else(|| format!("Invalid asset hash: {}", asset.hash))?
+                .to_string();
+            let asset_path = objects_dir.join(&hash_prefix).join(&asset.hash);
             let asset_url = format!(
                 "https://resources.download.minecraft.net/{}/{}",
                 hash_prefix, asset.hash
@@ -423,18 +401,15 @@ pub fn should_include_library(rules: &[Rule], current_os: &str) -> bool {
     let mut allowed = false;
 
     for rule in rules {
-        let matches = if let Some(os) = &rule.os {
-            os.name.as_deref() == Some(current_os)
-        } else {
-            true
+        let matches = match &rule.os {
+            Some(os) => os.name.as_deref() == Some(current_os),
+            None => true,
         };
 
-        if rule.action == "allow" && matches {
-            allowed = true;
-        } else if rule.action == "disallow" && matches {
-            return false;
+        if matches {
+            allowed = rule.action == "allow";
         }
     }
 
-    allowed || rules.iter().all(|r| r.action != "allow")
+    allowed
 }

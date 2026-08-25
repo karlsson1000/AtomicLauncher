@@ -152,13 +152,29 @@ impl FabricInstaller {
                     fs::create_dir_all(parent)?;
                 }
 
-                if let Ok(response) = self.http_client.get(&url).send().await {
-                    if response.status().is_success() {
-                        if let Ok(bytes) = response.bytes().await {
-                            let _ = fs::write(&lib_path, bytes);
-                        }
-                    }
+                let response = self
+                    .http_client
+                    .get(&url)
+                    .send()
+                    .await
+                    .map_err(|e| format!("Failed to download library {}: {}", lib.name, e))?;
+
+                if !response.status().is_success() {
+                    return Err(format!(
+                        "Failed to download library {}: HTTP {}",
+                        lib.name,
+                        response.status()
+                    )
+                    .into());
                 }
+
+                let bytes = response
+                    .bytes()
+                    .await
+                    .map_err(|e| format!("Failed to read library {}: {}", lib.name, e))?;
+
+                fs::write(&lib_path, bytes)
+                    .map_err(|e| format!("Failed to write library {}: {}", lib.name, e))?;
             }
         }
 

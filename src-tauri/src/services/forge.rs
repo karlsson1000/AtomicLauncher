@@ -1,7 +1,7 @@
 use crate::models::ForgeVersion;
+use crate::services::loader_common;
 use std::path::PathBuf;
 use serde::Deserialize;
-use std::process::{Command, Stdio};
 
 const FORGE_API_URL: &str = "https://maven.minecraftforge.net/api/maven/versions/releases/net/minecraftforge/forge";
 const FORGE_MAVEN_URL: &str = "https://maven.minecraftforge.net/releases";
@@ -9,10 +9,7 @@ const FORGE_MAVEN_URL: &str = "https://maven.minecraftforge.net/releases";
 type ForgeError = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct ForgeMavenResponse {
-    #[serde(default, rename = "isSnapshot")]
-    is_snapshot: bool,
     versions: Vec<String>,
 }
 
@@ -90,76 +87,12 @@ impl ForgeInstaller {
         Ok(compatible.forge_version.clone())
     }
 
-    fn ensure_launcher_profile(&self) -> Result<(), ForgeError> {
-        let launcher_profiles_path = self.meta_dir.join("launcher_profiles.json");
-
-        if !launcher_profiles_path.exists() {
-            let minimal_profile = serde_json::json!({
-                "profiles": {},
-                "settings": {
-                    "enableSnapshots": false,
-                    "enableAdvanced": false,
-                    "crashAssistance": true,
-                    "enableHistorical": false,
-                    "enableReleases": true,
-                    "keepLauncherOpen": false,
-                    "showGameLog": false,
-                    "showMenu": false,
-                    "soundOn": false
-                },
-                "version": 3
-            });
-
-            std::fs::write(
-                &launcher_profiles_path,
-                serde_json::to_string_pretty(&minimal_profile)?
-            )?;
-        }
-
-        Ok(())
-    }
-
-    fn cleanup_install_logs(&self, full_version: &str) {
-        let log_patterns: Vec<String> = vec![
-            "installer.log".to_string(),
-            "install.log".to_string(),
-            "forge_installer.log".to_string(),
-            format!("forge-{}-installer.jar.log", full_version),
-        ];
-
-        let search_dirs = vec![
-            self.meta_dir.clone(),
-            std::env::temp_dir(),
-            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")),
-        ];
-
-        for dir in &search_dirs {
-            for pattern in &log_patterns {
-                let log_path = dir.join(pattern);
-                if log_path.exists() {
-                    let _ = std::fs::remove_file(&log_path);
-                }
-            }
-        }
-
-        for dir in &search_dirs {
-            if let Ok(entries) = std::fs::read_dir(dir) {
-                for entry in entries.flatten() {
-                    if let Ok(file_name) = entry.file_name().into_string() {
-                        if file_name.contains("forge") && file_name.ends_with(".log") {
-                            let _ = std::fs::remove_file(entry.path());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     pub async fn install_forge(
         &self,
         forge_version: &str,
     ) -> Result<String, ForgeError> {
-        self.ensure_launcher_profile()?;
+        loader_common::ensure_launcher_profile(&self.meta_dir)
+            .map_err(|e| -> ForgeError { e.into() })?;
 
         let full_version = forge_version.to_string();
 
@@ -186,45 +119,22 @@ impl ForgeInstaller {
         }
 
         let installer_bytes = installer_response.bytes().await?;
+        let installer_path = loader_common::unique_installer_jar("forge", &full_version);
+        std::fs::write(&installer_path, &installer_bytes)?;
 
-        let temp_dir = std::env::temp_dir();
-        let installer_path = temp_dir.join(format!("forge-{}-installer.jar", full_version));
-        std::fs::write(&installer_path, installer_bytes)?;
-
-        let mut cmd = Command::new("java");
-        cmd.arg("-jar")
-            .arg(&installer_path)
-            .arg("--installClient")
-            .arg(&self.meta_dir)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-
-        #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            const CREATE_NO_WINDOW: u32 = 0x08000000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
-        }
-
-        let child = cmd.spawn()?;
-
-        let output = child.wait_with_output()?;
+        let meta_dir = self.meta_dir.clone();
+        let (success, stdout, stderr) =
+            loader_common::run_installer_jvm(installer_path.clone(), meta_dir).await?;
 
         let _ = std::fs::remove_file(&installer_path);
+        loader_common::cleanup_install_logs(&self.meta_dir, "forge", &full_version);
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
-
-            self.cleanup_install_logs(&full_version);
-
+        if !success {
             return Err(format!(
                 "Forge installer failed!\nStdout: {}\nStderr: {}",
                 stdout, stderr
             ).into());
         }
-
-        self.cleanup_install_logs(&full_version);
 
         if !json_path.exists() {
             return Err(format!(

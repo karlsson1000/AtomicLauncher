@@ -9,8 +9,11 @@ pub fn library_maven_path(libraries_dir: &Path, name: &str) -> PathBuf {
     if parts.len() < 3 {
         return libraries_dir.join("unknown.jar");
     }
-    let (group, artifact, version) = (parts[0], parts[1], parts[2]);
-    let classifier = if parts.len() >= 4 { Some(parts[3]) } else { None };
+    let (group, artifact, version_raw) = (parts[0], parts[1], parts[2]);
+    let version = version_raw.split('@').next().unwrap_or(version_raw);
+    let classifier_raw = if parts.len() >= 4 { parts[3] } else { "" };
+    let classifier = classifier_raw.split('@').next().unwrap_or("");
+    let classifier = if classifier.is_empty() { None } else { Some(classifier) };
     let group_path = group.replace('.', "/");
     let jar_name = if let Some(cls) = classifier {
         format!("{}-{}-{}.jar", artifact, version, cls)
@@ -25,8 +28,11 @@ pub fn library_maven_url(name: &str) -> String {
     if parts.len() < 3 {
         return String::new();
     }
-    let (group, artifact, version) = (parts[0], parts[1], parts[2]);
-    let classifier = if parts.len() >= 4 { Some(parts[3]) } else { None };
+    let (group, artifact, version_raw) = (parts[0], parts[1], parts[2]);
+    let version = version_raw.split('@').next().unwrap_or(version_raw);
+    let classifier_raw = if parts.len() >= 4 { parts[3] } else { "" };
+    let classifier = classifier_raw.split('@').next().unwrap_or("");
+    let classifier = if classifier.is_empty() { None } else { Some(classifier) };
     let group_path = group.replace('.', "/");
     let jar_name = if let Some(cls) = classifier {
         format!("{}-{}-{}.jar", artifact, version, cls)

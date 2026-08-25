@@ -4,6 +4,7 @@ pub mod import;
 pub mod fabric;
 pub mod neoforge;
 pub mod forge;
+pub mod loader_common;
 pub mod installer;
 pub mod settings;
 pub mod accounts;

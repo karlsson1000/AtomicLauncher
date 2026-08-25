@@ -542,31 +542,13 @@ impl super::instance::InstanceManager {
         let assets_id = base_version.assets.clone();
 
         let mut combined_libs = Vec::new();
-        let mut base_lib_names = HashSet::new();
-
-        for lib in &base_version.libraries {
-            if lib.name.contains(":natives-") {
-                continue;
-            }
-            if let Some(rules) = &lib.rules {
-                if !should_include_library(rules, current_os) {
-                    continue;
-                }
-            }
-            let parts: Vec<&str> = lib.name.split(':').collect();
-            if parts.len() >= 2 {
-                let lib_key = format!("{}:{}", parts[0], parts[1]);
-                base_lib_names.insert(lib_key);
-            }
-        }
+        let mut overlay_lib_keys = HashSet::new();
 
         for lib in &neoforge_profile.libraries {
             let parts: Vec<&str> = lib.name.split(':').collect();
             if parts.len() >= 2 {
                 let lib_key = format!("{}:{}", parts[0], parts[1]);
-                if base_lib_names.contains(&lib_key) {
-                    continue;
-                }
+                overlay_lib_keys.insert(lib_key);
             }
             combined_libs.push((lib.name.clone(), lib.url.clone().unwrap_or_default(), None));
         }
@@ -577,6 +559,13 @@ impl super::instance::InstanceManager {
             }
             if let Some(rules) = &lib.rules {
                 if !should_include_library(rules, current_os) {
+                    continue;
+                }
+            }
+            let parts: Vec<&str> = lib.name.split(':').collect();
+            if parts.len() >= 2 {
+                let lib_key = format!("{}:{}", parts[0], parts[1]);
+                if overlay_lib_keys.contains(&lib_key) {
                     continue;
                 }
             }
@@ -641,31 +630,13 @@ impl super::instance::InstanceManager {
         let assets_id = base_version.assets.clone();
 
         let mut combined_libs = Vec::new();
-        let mut base_lib_names = HashSet::new();
-
-        for lib in &base_version.libraries {
-            if lib.name.contains(":natives-") {
-                continue;
-            }
-            if let Some(rules) = &lib.rules {
-                if !should_include_library(rules, current_os) {
-                    continue;
-                }
-            }
-            let parts: Vec<&str> = lib.name.split(':').collect();
-            if parts.len() >= 2 {
-                let lib_key = format!("{}:{}", parts[0], parts[1]);
-                base_lib_names.insert(lib_key);
-            }
-        }
+        let mut overlay_lib_keys = HashSet::new();
 
         for lib in &forge_profile.libraries {
             let parts: Vec<&str> = lib.name.split(':').collect();
             if parts.len() >= 2 {
                 let lib_key = format!("{}:{}", parts[0], parts[1]);
-                if base_lib_names.contains(&lib_key) {
-                    continue;
-                }
+                overlay_lib_keys.insert(lib_key);
             }
             combined_libs.push((lib.name.clone(), lib.url.clone().unwrap_or_default(), None));
         }
@@ -676,6 +647,13 @@ impl super::instance::InstanceManager {
             }
             if let Some(rules) = &lib.rules {
                 if !should_include_library(rules, current_os) {
+                    continue;
+                }
+            }
+            let parts: Vec<&str> = lib.name.split(':').collect();
+            if parts.len() >= 2 {
+                let lib_key = format!("{}:{}", parts[0], parts[1]);
+                if overlay_lib_keys.contains(&lib_key) {
                     continue;
                 }
             }
@@ -939,8 +917,14 @@ impl super::instance::InstanceManager {
                 continue;
             }
 
-            let (group, artifact, lib_version) = (parts[0], parts[1], parts[2]);
-            let classifier = if parts.len() == 4 { Some(parts[3]) } else { None };
+            let (group, artifact, lib_version_raw) = (parts[0], parts[1], parts[2]);
+            let classifier_raw = if parts.len() == 4 { parts[3] } else { "" };
+            let classifier = classifier_raw.split('@').next().unwrap_or("");
+            let classifier = if classifier.is_empty() { None } else { Some(classifier) };
+            let lib_version = lib_version_raw.split('@').next().unwrap_or(lib_version_raw);
+            if lib_version.is_empty() {
+                continue;
+            }
 
             let lib_path = if let Some(path) = artifact_path {
                 libraries_dir.join(path)
@@ -1000,11 +984,7 @@ impl super::instance::InstanceManager {
             return Err(err_msg.into());
         }
 
-        let mut full_classpath = classpath.to_vec();
-        full_classpath.push(client_jar.to_string_lossy().to_string());
-
         let classpath_sep = if cfg!(windows) { ";" } else { ":" };
-        let classpath_str = full_classpath.join(classpath_sep);
 
         let natives_dir = get_instance_dir(instance_name).join("natives");
         let libraries_dir = meta_dir.join("libraries");
@@ -1020,7 +1000,7 @@ impl super::instance::InstanceManager {
             ("${classpath_separator}", classpath_sep),
             ("${launcher_name}", "octane-launcher"),
             ("${launcher_version}", "0.1.0"),
-            ("${version_name}", version),
+            ("${version_name}", &resolved.base_version_id),
             ("${game_directory}", &instance_dir_str),
             ("${assets_root}", &assets_root_str),
             ("${assets_index_name}", &resolved.assets_id),
@@ -1032,6 +1012,65 @@ impl super::instance::InstanceManager {
             ("${version_type}", "release"),
         ];
 
+        let mut full_classpath = classpath.to_vec();
+        if !(resolved.is_neoforge || resolved.is_forge) {
+            full_classpath.push(client_jar.to_string_lossy().to_string());
+        }
+
+        if resolved.is_neoforge || resolved.is_forge {
+            let substituted_jvm: Vec<String> = resolved
+                .jvm_arguments
+                .iter()
+                .map(|a| substitute_arg(a, subs))
+                .collect();
+
+            let mut module_path_files: HashSet<String> = HashSet::new();
+            let mut expect_paths = false;
+            for arg in &substituted_jvm {
+                if expect_paths {
+                    expect_paths = false;
+                    for part in arg.split(classpath_sep) {
+                        if let Some(name) = std::path::Path::new(part)
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                        {
+                            module_path_files.insert(name.to_lowercase());
+                        }
+                    }
+                    continue;
+                }
+                if arg == "-p" || arg == "--module-path" {
+                    expect_paths = true;
+                    continue;
+                }
+                if let Some(rest) = arg.strip_prefix("--module-path=") {
+                    for part in rest.split(classpath_sep) {
+                        if let Some(name) = std::path::Path::new(part)
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                        {
+                            module_path_files.insert(name.to_lowercase());
+                        }
+                    }
+                }
+            }
+
+            if !module_path_files.is_empty() {
+                full_classpath.retain(|cp| {
+                    let file_name = std::path::Path::new(cp)
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|s| s.to_lowercase());
+                    match file_name {
+                        Some(n) => !module_path_files.contains(&n),
+                        None => true,
+                    }
+                });
+            }
+        }
+
+        let classpath_str = full_classpath.join(classpath_sep);
+
         let xms = (effective_settings.memory_mb * 80 / 100).max(512);
 
         let mut cmd = Command::new(java_path);
@@ -1039,8 +1078,11 @@ impl super::instance::InstanceManager {
             .arg(format!("-Xmx{}M", effective_settings.memory_mb))
             .arg("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump")
             .arg("-Dminecraft.launcher.brand=octane-launcher")
-            .arg(format!("-Dminecraft.launcher.version={}", env!("CARGO_PKG_VERSION")))
-            .arg("-DFabricMcEmu=net.minecraft.client.main.Main");
+            .arg(format!("-Dminecraft.launcher.version={}", env!("CARGO_PKG_VERSION")));
+
+        if !resolved.is_forge && !resolved.is_neoforge {
+            cmd.arg("-DFabricMcEmu=net.minecraft.client.main.Main");
+        }
 
         if resolved.is_neoforge || resolved.is_forge {
             for arg in &resolved.jvm_arguments {
@@ -1065,6 +1107,40 @@ impl super::instance::InstanceManager {
                 .arg(format!("-DlibraryDirectory={}", libraries_dir.display()))
                 .arg(format!("-Dminecraft.client.jar={}", client_jar.display()))
                 .arg("-Dfml.earlyprogresswindow=false");
+
+            if resolved.is_neoforge {
+                let nf_version_dir = libraries_dir
+                    .join("net")
+                    .join("neoforged")
+                    .join("neoforge")
+                    .join(version);
+                let mut plugin_layer: Vec<String> = Vec::new();
+                let mut game_layer: Vec<String> = Vec::new();
+                if nf_version_dir.exists() {
+                    if let Ok(entries) = fs::read_dir(&nf_version_dir) {
+                        for entry in entries.flatten() {
+                            let name = entry.file_name().to_string_lossy().to_lowercase();
+                            if name.ends_with("-universal.jar") {
+                                plugin_layer.push(entry.path().to_string_lossy().into_owned());
+                            } else if name.ends_with("-client.jar") {
+                                game_layer.push(entry.path().to_string_lossy().into_owned());
+                            }
+                        }
+                    }
+                }
+                if !plugin_layer.is_empty() {
+                    cmd.arg(format!(
+                        "-Dfml.pluginLayerLibraries={}",
+                        plugin_layer.join(classpath_sep)
+                    ));
+                }
+                if !game_layer.is_empty() {
+                    cmd.arg(format!(
+                        "-Dfml.gameLayerLibraries={}",
+                        game_layer.join(classpath_sep)
+                    ));
+                }
+            }
         } else {
             cmd.arg(format!("-Djava.library.path={}", natives_dir.display()));
         }
