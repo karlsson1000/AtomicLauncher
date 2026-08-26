@@ -232,15 +232,22 @@ pub async fn launch_server(
         "server": safe_name
     }));
 
-    InstanceManager::launch_with_server(
-        &instance_name,
-        &active_account.username,
-        &active_account.uuid,
-        &access_token,
-        &server_arg,
-        app_handle.clone(),
-    )
-    .map_err(|e| e.to_string())
+    let username = active_account.username.clone();
+    let uuid = active_account.uuid.clone();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        InstanceManager::launch_with_server(
+            &instance_name,
+            &username,
+            &uuid,
+            &access_token,
+            &server_arg,
+            app_handle,
+        )
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 fn add_server_to_instance(

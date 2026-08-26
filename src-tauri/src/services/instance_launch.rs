@@ -73,6 +73,18 @@ fn substitute_arg(arg: &str, subs: &[(&str, &str)]) -> String {
     result
 }
 
+struct LaunchGuard<'a>(&'a str);
+
+impl Drop for LaunchGuard<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut processes) = crate::commands::instances::RUNNING_PROCESSES.lock() {
+            if processes.get(self.0) == Some(&0) {
+                processes.remove(self.0);
+            }
+        }
+    }
+}
+
 impl super::instance::InstanceManager {
     fn emit_error_log(app_handle: &tauri::AppHandle, instance_name: &str, error_msg: &str) {
         let _ = app_handle.emit("console-log", serde_json::json!({
@@ -245,27 +257,26 @@ impl super::instance::InstanceManager {
             let mut processes = crate::commands::instances::RUNNING_PROCESSES
                 .lock()
                 .map_err(|e| format!("Failed to acquire process lock: {}", e))?;
-            if processes.contains_key(instance_name) {
-                let err_msg = format!("Instance '{}' is already running", instance_name);
+            if let Some(pid) = processes.get(instance_name) {
+                let err_msg = if *pid == 0 {
+                    format!(
+                        "Instance '{}' is still launching (a first-time Java download may be in progress)",
+                        instance_name
+                    )
+                } else {
+                    format!("Instance '{}' is already running", instance_name)
+                };
                 Self::emit_error_log(&app_handle, instance_name, &err_msg);
                 return Err(err_msg.into());
             }
             processes.insert(instance_name.to_string(), 0);
         }
 
-        let outcome = Self::perform_launch(
+        let _guard = LaunchGuard(instance_name);
+
+        Self::perform_launch(
             instance_name, username, uuid, access_token, server_address, world_name, &app_handle,
-        );
-
-        if outcome.is_err() {
-            if let Ok(mut processes) = crate::commands::instances::RUNNING_PROCESSES.lock() {
-                if processes.get(instance_name) == Some(&0) {
-                    processes.remove(instance_name);
-                }
-            }
-        }
-
-        outcome
+        )
     }
 
     fn perform_launch(
@@ -287,8 +298,9 @@ impl super::instance::InstanceManager {
         }
 
         let (instance, version) = Self::step_load_instance(instance_name, &instance_dir, app_handle)?;
-        let (java_path, effective_settings) = Self::step_resolve_java(instance_name, &instance, app_handle)?;
         let required_java = Self::get_required_java_version(&version);
+        let (java_path, effective_settings) =
+            Self::step_resolve_java(instance_name, &instance, required_java, app_handle)?;
         Self::step_check_java(instance_name, &version, &java_path, required_java, app_handle)?;
         let resolved = Self::step_resolve_profile(instance_name, &version, &meta_dir, app_handle)?;
         Self::step_extract_natives(instance_name, &resolved, &meta_dir, app_handle)?;
@@ -319,34 +331,79 @@ impl super::instance::InstanceManager {
     fn step_resolve_java(
         instance_name: &str,
         instance: &Instance,
+        required_java: u32,
         app_handle: &tauri::AppHandle,
     ) -> Result<(String, LauncherSettings), Box<dyn std::error::Error>> {
         let mut effective_settings = crate::services::settings::SettingsManager::load()
             .unwrap_or_default();
 
+        let mut instance_java: Option<String> = None;
         if let Some(override_settings) = &instance.settings_override {
             effective_settings.memory_mb = override_settings.memory_mb;
             if let Some(java) = override_settings.java_path.as_deref() {
                 if !java.trim().is_empty() {
-                    effective_settings.java_path = Some(java.to_string());
+                    instance_java = Some(java.to_string());
                 }
             }
         }
 
-        let java_path = if let Some(custom_java) = &effective_settings.java_path {
-            custom_java.clone()
+        let java_path = if let Some(custom_java) = instance_java {
+            custom_java
         } else {
-            match find_java() {
+            let global_preference = effective_settings
+                .java_path
+                .clone()
+                .filter(|p| !p.trim().is_empty());
+
+            let suitable_java = global_preference
+                .into_iter()
+                .chain(find_java())
+                .filter(|path| {
+                    Self::get_java_version(path)
+                        .map(|found| Self::is_java_compatible(found, required_java))
+                        .unwrap_or(false)
+                })
+                .next();
+
+            match suitable_java {
                 Some(path) => path,
                 None => {
-                    let err_msg = "Java not found. Please install Java or specify a custom Java path in settings.";
-                    Self::emit_error_log(app_handle, instance_name, err_msg);
-                    return Err(err_msg.into());
+                    match tauri::async_runtime::block_on(super::java_runtime::ensure_java_for_launch(
+                        required_java,
+                        instance_name,
+                        app_handle,
+                    )) {
+                        Ok(Some(managed)) => managed,
+                        Ok(None) => {
+                            Self::emit_error_log(app_handle, instance_name, &format!(
+                                "No managed Java {} runtime is available for this platform.",
+                                required_java
+                            ));
+                            find_java().ok_or_else(|| -> Box<dyn std::error::Error> {
+                                "Java not found. Please install Java or specify a custom Java path in settings.".into()
+                            })?
+                        }
+                        Err(e) => {
+                            Self::emit_error_log(app_handle, instance_name, &format!(
+                                "Automatic Java download failed: {}. Please install Java {} or specify a custom Java path in settings.",
+                                e, required_java
+                            ));
+                            return Err(e.into());
+                        }
+                    }
                 }
             }
         };
 
         Ok((java_path, effective_settings))
+    }
+
+    fn is_java_compatible(found_major: u32, required_major: u32) -> bool {
+        if required_major <= 8 {
+            found_major == required_major
+        } else {
+            found_major >= required_major
+        }
     }
 
     fn step_check_java(

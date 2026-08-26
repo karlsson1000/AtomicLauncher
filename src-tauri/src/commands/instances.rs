@@ -388,14 +388,21 @@ pub async fn launch_instance_with_active_account(
         .await
         .map_err(|e| e.to_string())?;
 
-    crate::services::instance::InstanceManager::launch(
-        &safe_name,
-        &active_account.username,
-        &active_account.uuid,
-        &access_token,
-        app_handle,
-    )
-    .map_err(|e| e.to_string())
+    let username = active_account.username.clone();
+    let uuid = active_account.uuid.clone();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::services::instance::InstanceManager::launch(
+            &safe_name,
+            &username,
+            &uuid,
+            &access_token,
+            app_handle,
+        )
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -415,15 +422,22 @@ pub async fn launch_world(
         .await
         .map_err(|e| e.to_string())?;
 
-    crate::services::instance::InstanceManager::launch_with_world(
-        &safe_name,
-        &active_account.username,
-        &active_account.uuid,
-        &access_token,
-        &world_name,
-        app_handle,
-    )
-    .map_err(|e| e.to_string())
+    let username = active_account.username.clone();
+    let uuid = active_account.uuid.clone();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::services::instance::InstanceManager::launch_with_world(
+            &safe_name,
+            &username,
+            &uuid,
+            &access_token,
+            &world_name,
+            app_handle,
+        )
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

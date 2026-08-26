@@ -6,6 +6,7 @@ pub mod neoforge;
 pub mod forge;
 pub mod loader_common;
 pub mod installer;
+pub mod java_runtime;
 pub mod settings;
 pub mod accounts;
 pub mod friends;
