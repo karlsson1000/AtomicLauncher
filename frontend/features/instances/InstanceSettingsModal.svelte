@@ -464,7 +464,7 @@
   let ramPercent = $derived(((instanceMemoryMb - minMem) / (maxMem - minMem)) * 100)
 </script>
 
-{#if isOpen && !isClosing}
+{#if isOpen}
   <div
     role="presentation"
     class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 modal-backdrop"
