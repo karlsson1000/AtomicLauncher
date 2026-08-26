@@ -17,7 +17,6 @@
   let contextMenu = $state<{ x: number; y: number; instance: Instance } | null>(null)
   let snapshots = $state<Snapshot[]>([])
   let loadingSnapshots = $state(true)
-  let instanceIcons = $state<Record<string, string | null>>({})
   let tooltipInstance = $state<Instance | null>(null)
   let tooltipTimer: ReturnType<typeof setTimeout> | undefined
 
