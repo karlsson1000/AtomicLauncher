@@ -272,7 +272,17 @@ pub async fn kill_instance(instance_name: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn get_instances() -> Result<Vec<Instance>, String> {
-    InstanceManager::get_all().map_err(|e| e.to_string())
+    let mut instances = InstanceManager::get_all().map_err(|e| e.to_string())?;
+    let instances_dir = get_instances_dir();
+
+    for instance in &mut instances {
+        if let Some(rel) = &instance.icon_path {
+            let abs = instances_dir.join(&instance.name).join(rel);
+            instance.icon_path = Some(abs.to_string_lossy().into_owned());
+        }
+    }
+
+    Ok(instances)
 }
 
 #[tauri::command]
@@ -420,7 +430,7 @@ pub async fn launch_world(
 pub async fn set_instance_icon(
     instance_name: String,
     image_data: String,
-) -> Result<(), String> {
+) -> Result<Option<String>, String> {
     let safe_name = sanitize_instance_name(&instance_name)?;
     
     let instance_dir = get_instance_dir(&safe_name);
@@ -467,11 +477,11 @@ pub async fn set_instance_icon(
     
     let updated_json = serde_json::to_string_pretty(&instance)
         .map_err(|e| e.to_string())?;
-    
+
     std::fs::write(&instance_json, updated_json)
         .map_err(|e| e.to_string())?;
-    
-    Ok(())
+
+    Ok(Some(instance_dir.join("icon.png").to_string_lossy().into_owned()))
 }
 
 #[tauri::command]
@@ -506,40 +516,6 @@ pub async fn remove_instance_icon(instance_name: String) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     
     Ok(())
-}
-
-#[tauri::command]
-pub async fn get_instance_icon(instance_name: String) -> Result<Option<String>, String> {
-    let safe_name = sanitize_instance_name(&instance_name)?;
-    
-    let instance_dir = get_instance_dir(&safe_name);
-    
-    if !instance_dir.exists() {
-        return Err(format!("Instance '{}' does not exist", safe_name));
-    }
-    
-    let icon_path = instance_dir.join("icon.png");
-    
-    if !icon_path.exists() {
-        return Ok(None);
-    }
-    
-    let canonical_icon = icon_path.canonicalize()
-        .map_err(|_| "Icon file not found".to_string())?;
-    
-    let canonical_instance = instance_dir.canonicalize()
-        .map_err(|_| "Instance directory not found".to_string())?;
-    
-    if !canonical_icon.starts_with(&canonical_instance) {
-        return Err("Invalid icon path".to_string());
-    }
-    
-    let image_bytes = std::fs::read(&icon_path)
-        .map_err(|e| e.to_string())?;
-    
-    let base64_data = general_purpose::STANDARD.encode(&image_bytes);
-    
-    Ok(Some(format!("data:image/png;base64,{}", base64_data)))
 }
 
 #[tauri::command]

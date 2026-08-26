@@ -7,6 +7,7 @@
   import type { Instance, ModFileWithMetadata } from "../../types"
   import { getMinecraftVersion } from "../../lib/version"
   import { formatFileSize, formatPlaytime, formatDate } from "../../lib/format"
+  import { instanceIconSrc } from "../../lib/icons"
   import {
     store, handleLaunch, handleWorldLaunch, handleCloseDetails,
     loadInstances
@@ -45,7 +46,6 @@
   let worlds = $state<World[]>([])
   let isLoadingMods = $state(true)
   let isLoadingWorlds = $state(true)
-  let instanceIcon = $state<string | null>(null)
   let isSettingsOpen = $state(false)
   let availableUpdates = $state<ModUpdate[]>([])
   let isCheckingUpdates = $state(false)
@@ -90,18 +90,9 @@
     loadWorlds()
     loadResourcePacks()
     loadShaderPacks()
-    loadInstanceIcon()
   })
 
-  async function loadInstanceIcon() {
-    try {
-      const icon = await invoke<string | null>("get_instance_icon", { instanceName: instance.name })
-      instanceIcon = icon
-    } catch (error) {
-      console.error("Failed to load instance icon:", error)
-      instanceIcon = null
-    }
-  }
+  const instanceIcon = $derived(instanceIconSrc(instance.icon_path))
 
   async function loadWorlds() {
     isLoadingWorlds = true
@@ -371,7 +362,6 @@
   }
 
   function handleInstanceUpdated() {
-    loadInstanceIcon()
     onInstanceUpdated?.()
     loadInstances()
   }

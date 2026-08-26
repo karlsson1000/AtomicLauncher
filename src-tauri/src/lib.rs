@@ -208,7 +208,6 @@ pub fn run() {    if let Err(e) = dotenvy::dotenv() {
             open_screenshots_folder,
             set_instance_icon,
             remove_instance_icon,
-            get_instance_icon,
             apply_saved_options,
             save_options_as_default,
             launch_world,

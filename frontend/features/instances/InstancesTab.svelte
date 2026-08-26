@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Package, FolderOpen, Copy, FileArchive, FolderSymlink, FolderX, Trash2, Play, Search, Plus, FolderPlus, ChevronDown, ChevronUp, Save, ClipboardCheck } from "lucide-svelte"
   import { invoke } from "@tauri-apps/api/core"
+import { instanceIconSrc } from "../../lib/icons"
   import type { Instance } from "../../types"
   import { getMinecraftVersion } from "../../lib/version"
   import ContextMenu from "../../components/ui/ContextMenu.svelte"
@@ -49,8 +50,6 @@
   let groups = $state<Record<string, string[]>>({})
   let searchQuery = $state("")
   let showGroupModal = $state(false)
-
-  let instanceIcons = $state<Record<string, string | null>>({})
   let sortBy = $state<SortOption>("recently-played")
   let collapsed = $state<Record<string, boolean>>({})
   let groupModalInstance = $state<Instance | null>(null)
@@ -60,21 +59,6 @@
   $effect(() => {
     storeGet<Record<string, string[]>>("instance_groups").then(g => { if (g) groups = g })
     storeGet<Record<string, boolean>>("group_collapsed").then(c => { if (c) collapsed = c })
-  })
-
-  $effect(() => {
-    const loadIcons = async () => {
-      const icons: Record<string, string | null> = {}
-      await Promise.all(store.instances.map(async (instance) => {
-        try {
-          icons[instance.name] = await invoke<string | null>("get_instance_icon", { instanceName: instance.name })
-        } catch {
-          icons[instance.name] = null
-        }
-      }))
-      instanceIcons = icons
-    }
-    if (store.instances.length > 0) loadIcons()
   })
 
   $effect(() => {
@@ -337,8 +321,8 @@
                     class="bg-[var(--bg-tertiary)] rounded-md flex items-center hover:bg-[var(--bg-hover)] transition-all cursor-pointer group relative overflow-hidden"
                   >
                     <div class="relative flex-shrink-0">
-                      {#if instanceIcons[instance.name]}
-                        <img src={instanceIcons[instance.name]!} alt={instance.name} class="w-20 h-20 object-cover" />
+                      {#if instanceIconSrc(instance.icon_path)}
+                        <img src={instanceIconSrc(instance.icon_path)} alt={instance.name} class="w-20 h-20 object-cover" />
                       {:else}
                         <div class="w-20 h-20 flex items-center justify-center">
                           <Package size={36} class="text-[var(--text-muted)]" />
@@ -422,8 +406,8 @@
                     class="bg-[var(--bg-tertiary)] rounded-md flex items-center hover:bg-[var(--bg-hover)] transition-all cursor-pointer group relative overflow-hidden"
                   >
                     <div class="relative flex-shrink-0">
-                      {#if instanceIcons[instance.name]}
-                        <img src={instanceIcons[instance.name]!} alt={instance.name} class="w-20 h-20 object-cover" />
+                      {#if instanceIconSrc(instance.icon_path)}
+                        <img src={instanceIconSrc(instance.icon_path)} alt={instance.name} class="w-20 h-20 object-cover" />
                       {:else}
                         <div class="w-20 h-20 flex items-center justify-center">
                           <Package size={36} class="text-[var(--text-muted)]" />

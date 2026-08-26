@@ -367,9 +367,8 @@
         const base64 = (reader.result as string).split(",")[1]
 
         try {
-          await invoke("set_instance_icon", { instanceName: instance.name, imageData: base64 })
-          const newIcon = await invoke<string | null>("get_instance_icon", { instanceName: instance.name })
-          localIcon = newIcon
+          const iconPath = await invoke<string | null>("set_instance_icon", { instanceName: instance.name, imageData: base64 })
+          localIcon = instanceIconSrc(iconPath)
           onInstanceUpdated()
         } catch (error) {
           console.error("Failed to set icon:", error)

@@ -3,6 +3,7 @@
   import { invoke } from "@tauri-apps/api/core"
   import type { Instance, Snapshot, SnapshotsResponse } from "../../types"
   import { getMinecraftVersion } from "../../lib/version"
+  import { instanceIconSrc } from "../../lib/icons"
   import { formatPlaytime, cleanVersionName } from "../../lib/format"
   import ContextMenu from "../../components/ui/ContextMenu.svelte"
   import {
@@ -43,20 +44,6 @@
   )
 
   let heroDisabled = $derived(store.launchingInstanceName !== null && !isLastPlayedRunning && !isLastPlayedLaunching)
-
-  $effect(() => {
-    if (recentInstances.length === 0) return
-    const loadIcons = async () => {
-      const icons: Record<string, string | null> = {}
-      await Promise.all(recentInstances.map(async (instance) => {
-        try {
-          icons[instance.name] = await invoke<string | null>("get_instance_icon", { instanceName: instance.name })
-        } catch { icons[instance.name] = null }
-      }))
-      instanceIcons = icons
-    }
-    loadIcons()
-  })
 
   $effect(() => {
     const loadSnapshots = async () => {
@@ -176,7 +163,7 @@
         {#each recentInstances as instance (instance.name)}
           {@const isRunning = store.runningInstances.has(instance.name)}
           {@const isLaunching = store.launchingInstanceName === instance.name}
-          {@const icon = instanceIcons[instance.name]}
+          {@const icon = instanceIconSrc(instance.icon_path)}
           <div
             role="button"
             tabindex="0"

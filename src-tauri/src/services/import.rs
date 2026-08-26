@@ -837,11 +837,13 @@ impl InstanceImporter {
         img.write_to(&mut png_buffer, image::ImageFormat::Png)
             .map_err(|e| e.to_string())?;
 
-        crate::commands::set_instance_icon(
+        let _ = crate::commands::set_instance_icon(
             target_name.to_string(),
             general_purpose::STANDARD.encode(png_buffer.into_inner()),
         )
-        .await
+        .await;
+
+        Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]

@@ -1,6 +1,5 @@
 <script lang="ts">
   import { Search, Check, Puzzle, Layers, Image, Sparkles, Package, X } from "lucide-svelte"
-  import { invoke } from "@tauri-apps/api/core"
   import AddonList from "./AddonList.svelte"
   import ProjectDetail from "./ProjectDetail.svelte"
   import { ADDON_CATEGORIES, type ContentSource } from "./adapters"
@@ -10,6 +9,7 @@
   } from "../../lib/launcherStore.svelte"
   import type { Instance } from "../../types"
   import { getMinecraftVersion } from "../../lib/version"
+  import { instanceIconSrc } from "../../lib/icons"
 
   let viewDetail = $state<{
     source: "modrinth" | "curseforge"
@@ -22,7 +22,6 @@
   let contentSource = $state<ContentSource>("modrinth")
   let showSourceDropdown = $state(false)
   let searchQuery = $state("")
-  let instanceIcons = $state<Record<string, string | null>>({})
   const moddedInstances = $derived(store.instances.filter(i => i.loader === "fabric" || i.loader === "neoforge" || i.loader === "forge"))
 
   $effect(() => {
@@ -38,22 +37,6 @@
     { id: "resourcepacks" as const, label: "Resource Packs", icon: Image, color: "text-[#8b5cf6]" },
     { id: "shaderpacks" as const, label: "Shader Packs", icon: Sparkles, color: "text-[#f59e0b]" },
   ]
-
-  $effect(() => {
-    if (store.instances.length === 0) return
-    const loadIcons = async () => {
-      const icons: Record<string, string | null> = {}
-      for (const instance of store.instances) {
-        try {
-          icons[instance.name] = await invoke<string | null>("get_instance_icon", { instanceName: instance.name })
-        } catch {
-          icons[instance.name] = null
-        }
-      }
-      instanceIcons = icons
-    }
-    loadIcons()
-  })
 
   const getLoaderDisplay = (instance: Instance): { name: string; color: string } => {
     if (instance.loader === "fabric") return { name: "Fabric", color: "text-[#3b82f6]" }
@@ -194,7 +177,7 @@
                 <p class="text-xs text-[#3a3f4b]">No modded instances</p>
               {:else}
                 {#each moddedInstances as instance}
-                  {@const icon = instanceIcons[instance.name]}
+                  {@const icon = instanceIconSrc(instance.icon_path)}
                   {@const loader = getLoaderDisplay(instance)}
                   <button
                     onclick={() => setSelectedInstance(instance)}
