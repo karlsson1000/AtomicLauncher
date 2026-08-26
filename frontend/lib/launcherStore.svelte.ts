@@ -249,7 +249,6 @@ async function handleLaunch(instance: Instance) {
   } catch (error) {
     console.error("Launch error:", error)
     showToast("error", `Failed to launch ${instance.name}: ${String(error)}`)
-    store.consoleLogs = [...store.consoleLogs, { instance: instance.name, message: `ERROR: ${String(error)}`, type: "stderr" }]
     store.launchingInstanceName = null
   }
 }
