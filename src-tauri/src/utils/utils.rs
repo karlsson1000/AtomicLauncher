@@ -86,6 +86,50 @@ pub fn get_saved_options_path() -> PathBuf {
     get_launcher_dir().join("saved-options.txt")
 }
 
+pub fn find_java_homes_from_registry() -> Vec<String> {
+    #[cfg(target_os = "windows")]
+    {
+        use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+        use winreg::RegKey;
+
+        let hives = [HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER];
+        let roots = [
+            r"SOFTWARE\JavaSoft\JDK",
+            r"SOFTWARE\JavaSoft\Java Runtime Environment",
+            r"SOFTWARE\JavaSoft\JRE",
+            r"SOFTWARE\Eclipse Adoptium\JDK",
+            r"SOFTWARE\Eclipse Adoptium\JRE",
+            r"SOFTWARE\Microsoft\JDK",
+            r"SOFTWARE\Amazon Corretto",
+            r"SOFTWARE\Azul Systems\Zulu",
+        ];
+
+        let mut homes: Vec<String> = Vec::new();
+        for hive in hives {
+            let hkey = RegKey::predef(hive);
+            for root in roots {
+                let Ok(key) = hkey.open_subkey(root) else { continue };
+                if let Ok(home) = key.get_value::<String, _>("JavaHome") {
+                    homes.push(home);
+                }
+                for sub in key.enum_keys().flatten() {
+                    if let Ok(subkey) = key.open_subkey(&sub) {
+                        if let Ok(home) = subkey.get_value::<String, _>("JavaHome") {
+                            homes.push(home);
+                        }
+                    }
+                }
+            }
+        }
+        homes
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Vec::new()
+    }
+}
+
 pub fn find_java() -> Option<String> {
     if let Ok(java_home) = std::env::var("JAVA_HOME") {
         #[cfg(target_os = "windows")]
@@ -175,6 +219,21 @@ pub fn find_java() -> Option<String> {
                         }
                     }
                 }
+            }
+        }
+
+        let mut registry_homes = find_java_homes_from_registry();
+        registry_homes.sort();
+        registry_homes.dedup();
+        for home in registry_homes {
+            let home_dir = PathBuf::from(&home);
+            let javaw = home_dir.join("bin").join("javaw.exe");
+            if javaw.exists() {
+                return Some(javaw.to_string_lossy().to_string());
+            }
+            let java = home_dir.join("bin").join("java.exe");
+            if java.exists() {
+                return Some(java.to_string_lossy().to_string());
             }
         }
     }

@@ -110,6 +110,12 @@ pub async fn detect_java_installations() -> Result<Vec<String>, String> {
 
     #[cfg(target_os = "windows")]
     {
+        for home in crate::utils::find_java_homes_from_registry() {
+            if let Some(p) = detect_path(&home, java_bin) {
+                try_add(&mut java_paths, &p);
+            }
+        }
+
         let common_paths = vec![
             "C:\\Program Files\\Java",
             "C:\\Program Files (x86)\\Java",
@@ -126,9 +132,7 @@ pub async fn detect_java_installations() -> Result<Vec<String>, String> {
                 for entry in entries.flatten() {
                     if entry.path().is_dir() {
                         if let Some(p) = detect_path(&entry.path().to_string_lossy(), java_bin) {
-                            if get_java_info(&p).is_ok() {
-                                try_add(&mut java_paths, &p);
-                            }
+                            try_add(&mut java_paths, &p);
                         }
                     }
                 }
@@ -142,9 +146,7 @@ pub async fn detect_java_installations() -> Result<Vec<String>, String> {
                     for entry in entries.flatten() {
                         if entry.path().is_dir() {
                             if let Some(p) = detect_path(&entry.path().to_string_lossy(), java_bin) {
-                                if get_java_info(&p).is_ok() {
-                                    try_add(&mut java_paths, &p);
-                                }
+                                try_add(&mut java_paths, &p);
                             }
                         }
                     }
@@ -159,9 +161,7 @@ pub async fn detect_java_installations() -> Result<Vec<String>, String> {
             let exe_path = PathBuf::from(path).join(java_bin);
             if exe_path.exists() {
                 if let Some(s) = exe_path.to_str() {
-                    if get_java_info(s).is_ok() {
-                        try_add(&mut java_paths, s);
-                    }
+                    try_add(&mut java_paths, s);
                 }
             }
         }
@@ -169,24 +169,24 @@ pub async fn detect_java_installations() -> Result<Vec<String>, String> {
 
     if let Ok(java_home) = std::env::var("JAVA_HOME") {
         if let Some(p) = detect_path(&java_home, java_bin) {
-            if get_java_info(&p).is_ok() {
-                try_add(&mut java_paths, &p);
-            }
+            try_add(&mut java_paths, &p);
         }
     }
 
     java_paths.sort();
     java_paths.dedup();
 
+    let mut verified: Vec<String> = Vec::new();
     let mut fresh_detected = Vec::new();
     for p in &java_paths {
         if let Ok(info) = get_java_info(p) {
+            verified.push(p.clone());
             fresh_detected.push(info);
         }
     }
     cache_jres(&fresh_detected);
 
-    Ok(java_paths)
+    Ok(verified)
 }
 
 use base64::{engine::general_purpose, Engine as _};

@@ -22,7 +22,6 @@ impl MinecraftInstaller {
         })
     }
 
-    // Ensure launcher_profiles.json exists
     fn ensure_launcher_profile(&self) -> Result<(), DownloadError> {
         crate::services::loader_common::ensure_launcher_profile(&self.launcher_dir)
             .map_err(|e| -> DownloadError { e.into() })
@@ -145,8 +144,7 @@ impl MinecraftInstaller {
     }
 
     pub async fn install_version(&self, version_id: &str) -> Result<(), DownloadError> {
-        // Ensure launcher profile exists
-        self.ensure_launcher_profile()?;
+            self.ensure_launcher_profile()?;
 
         let manifest_response = self.http_client.get(VERSION_MANIFEST_URL).send().await?;
         let manifest: VersionManifest = manifest_response.json().await?;

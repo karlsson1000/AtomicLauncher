@@ -42,3 +42,6 @@ lazy_static = "1.4"
 libc = "0.2"
 sha2 = "0.10"
 keyring = { version = "3", features = ["windows-native", "sync-secret-service"] }
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"

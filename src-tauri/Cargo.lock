@@ -34,6 +34,7 @@ dependencies = [
  "url",
  "uuid",
  "webbrowser",
+ "winreg 0.55.0",
  "zip 2.4.2",
 ]
 

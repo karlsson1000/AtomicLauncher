@@ -180,7 +180,7 @@ impl super::instance::InstanceManager {
         if parts.len() >= 2 {
             if let (Ok(major), Ok(minor)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
                 if major == 1 {
-                    if minor >= 20 && parts.len() >= 3 {
+                    if minor == 20 && parts.len() >= 3 {
                         if let Ok(patch) = parts[2].parse::<u32>() {
                             if patch >= 5 {
                                 return 21;
@@ -188,10 +188,11 @@ impl super::instance::InstanceManager {
                         }
                     }
 
-                    if minor >= 20 { return 17; }
+                    if minor > 20 { return 21; }
+                    if minor == 20 { return 17; }
                     if minor >= 18 { return 17; }
-                    if minor >= 17 { return 16; }
-                    if minor >= 16 { return 8; }
+                    if minor == 17 { return 16; }
+                    if minor <= 16 { return 8; }
                 }
             }
         }
@@ -360,6 +361,15 @@ impl super::instance::InstanceManager {
                 if java_version < required_java {
                     let err_msg = format!(
                         "Java {} detected, but Minecraft {} requires Java {} or higher. Please update Java in Settings.",
+                        java_version, version, required_java
+                    );
+                    Self::emit_error_log(app_handle, instance_name, &err_msg);
+                    return Err(err_msg.into());
+                }
+
+                if required_java <= 8 && java_version != required_java {
+                    let err_msg = format!(
+                        "Java {} detected, but Minecraft {} requires Java {}.",
                         java_version, version, required_java
                     );
                     Self::emit_error_log(app_handle, instance_name, &err_msg);
