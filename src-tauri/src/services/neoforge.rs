@@ -170,11 +170,12 @@ impl NeoForgeInstaller {
         std::fs::write(&installer_path, &installer_bytes)?;
 
         let meta_dir = self.meta_dir.clone();
-        let (success, stdout, stderr) =
-            loader_common::run_installer_jvm(installer_path.clone(), meta_dir).await?;
+        let install_result =
+            loader_common::run_installer_jvm(installer_path.clone(), meta_dir).await;
 
         let _ = std::fs::remove_file(&installer_path);
         loader_common::cleanup_install_logs(&self.meta_dir, "neoforge", &full_version);
+        let (success, stdout, stderr) = install_result?;
 
         if !success {
             return Err(format!(

@@ -90,6 +90,7 @@ fn run_installer_blocking(java: &str, jar: &Path, meta_dir: &Path) -> Result<Ins
         .arg(jar)
         .arg("--installClient")
         .arg(meta_dir)
+        .current_dir(meta_dir)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
