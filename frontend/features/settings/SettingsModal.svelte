@@ -3,6 +3,7 @@
   import { Loader2, ImagePlus, FolderOpen, X, Check, ChevronDown, Paintbrush, Play, AppWindow, HardDrive } from "lucide-svelte"
   import AlertModal from "../../components/ui/AlertModal.svelte"
   import TrashSection from "./TrashSection.svelte"
+  import { untrack } from "svelte"
   import { store, setSettings, loadBackground, setShowOnboarding } from "../../lib/launcherStore.svelte"
   import { storeSet } from "../../lib/store"
   import type { LauncherSettings } from "../../types"
@@ -93,6 +94,16 @@
   let ramSliderValue = $state(store.settings?.memory_mb ?? 4096)
   let ramTextValue = $state(((store.settings?.memory_mb ?? 4096) / 1024).toFixed(1))
   let ramTextFocused = $state(false)
+  let javaArgsText = $state("")
+  let javaArgsFocused = $state(false)
+
+  function commitJavaArgsFocus() {
+    javaArgsFocused = false
+    if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = undefined }
+    const normalized = javaArgsText.replace(/\s+/g, " ").trim()
+    handleSettingChange({ ...store.settings!, java_args: normalized === "" ? null : normalized } as LauncherSettings)
+    javaArgsText = store.settings?.java_args ?? ""
+  }
 
   $effect(() => {
     if (!ramTextFocused) ramTextValue = (ramSliderValue / 1024).toFixed(1)
@@ -125,27 +136,37 @@
 
   $effect(() => {
     if (isOpen) {
-      ramSliderValue = store.settings?.memory_mb ?? 4096
-      loadSystemInfo()
-      loadSidebarBackground()
-      loadJavaInstallations()
-      loadAppVersion()
-      loadStorageUsage()
+      untrack(() => {
+        ramSliderValue = store.settings?.memory_mb ?? 4096
+        if (!javaArgsFocused) javaArgsText = store.settings?.java_args ?? ""
+        loadSystemInfo()
+        loadSidebarBackground()
+        loadJavaInstallations()
+        loadAppVersion()
+        loadStorageUsage()
 
-      const target = store.settingsScrollTarget
-      if (target) {
-        activeTab = SECTION_TAB[target] ?? "appearance"
-        store.settingsScrollTarget = null
-        setTimeout(() => {
-          document
-            .getElementById(`settings-${target}`)
-            ?.scrollIntoView({ behavior: "smooth", block: "center" })
-        }, 80)
-      }
+        const target = store.settingsScrollTarget
+        if (target) {
+          activeTab = SECTION_TAB[target] ?? "appearance"
+          store.settingsScrollTarget = null
+          setTimeout(() => {
+            document
+              .getElementById(`settings-${target}`)
+              ?.scrollIntoView({ behavior: "smooth", block: "center" })
+          }, 80)
+        }
+      })
     }
 
     return () => {
       if (saveTimeout) clearTimeout(saveTimeout)
+    }
+  })
+
+  $effect(() => {
+    const nextJavaArgs = store.settings?.java_args ?? ""
+    if (isOpen && !javaArgsFocused && nextJavaArgs !== javaArgsText) {
+      javaArgsText = nextJavaArgs
     }
   })
 
@@ -252,6 +273,12 @@
     setSettings(newSettings)
     if (saveTimeout) clearTimeout(saveTimeout)
     saveTimeout = setTimeout(() => handleSettingChange(newSettings), 500)
+  }
+
+  function handleJavaArgsChange(value: string) {
+    javaArgsText = value
+    const normalized = value.replace(/\s+/g, " ").trim()
+    handleSettingChangeDebounced({ ...store.settings!, java_args: normalized === "" ? null : normalized } as LauncherSettings)
   }
 
   async function handleFileSelect(e: any) {
@@ -528,6 +555,23 @@
                     onkeydown={(e) => { if (e.key === 'Enter' && customPathValue.trim()) { handleSettingChange({ ...store.settings!, java_path: customPathValue.trim() } as LauncherSettings); (e.currentTarget as HTMLInputElement).blur() } }}
                   />
                 {/if}
+
+                <div class="mt-5 pt-4 border-t border-[var(--bg-hover)]">
+                  <h5 class="text-sm font-semibold text-[var(--text-primary)] mb-1">Custom Java arguments</h5>
+                  <p class="text-xs text-[var(--text-muted)] mb-3">
+                    Extra JVM flags appended at launch for every instance.
+                  </p>
+                  <textarea
+                    bind:value={javaArgsText}
+                    oninput={(e) => handleJavaArgsChange((e.currentTarget as HTMLTextAreaElement).value)}
+                    onfocus={() => (javaArgsFocused = true)}
+                    onblur={() => commitJavaArgsFocus()}
+                    rows={2}
+                    spellcheck="false"
+                    placeholder="-Xmx4G -XX:+UseG1GC"
+                    class="w-full bg-[var(--bg-primary)] rounded-lg px-4 py-2.5 text-xs font-mono text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none resize-y min-h-[60px] max-h-40 custom-scrollbar"
+                  ></textarea>
+                </div>
               </section>
             {:else if activeTab === "launcher"}
               <section class="bg-[var(--bg-elevated)] rounded-lg p-4 flex items-center justify-between gap-8">

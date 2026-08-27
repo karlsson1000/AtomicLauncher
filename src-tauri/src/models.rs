@@ -106,6 +106,8 @@ pub struct LauncherSettings {
     pub default_tab: String,
     #[serde(default)]
     pub cat_mode: bool,
+    #[serde(default)]
+    pub java_args: Option<String>,
 }
 
 fn default_memory() -> u32 { 4096 }
@@ -122,6 +124,7 @@ impl Default for LauncherSettings {
             theme: default_theme(),
             default_tab: default_tab(),
             cat_mode: false,
+            java_args: None,
         }
     }
 }

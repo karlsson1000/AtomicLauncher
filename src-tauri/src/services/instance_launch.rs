@@ -1019,6 +1019,41 @@ impl super::instance::InstanceManager {
         Ok(classpath)
     }
 
+    fn split_java_args(input: &str) -> Vec<String> {
+        let mut args: Vec<String> = Vec::new();
+        let mut current = String::new();
+        let mut quote_char: Option<char> = None;
+
+        for ch in input.chars() {
+            match quote_char {
+                Some(q) => {
+                    if ch == q {
+                        quote_char = None;
+                    } else {
+                        current.push(ch);
+                    }
+                }
+                None => {
+                    if ch == '"' || ch == '\'' {
+                        quote_char = Some(ch);
+                    } else if ch.is_whitespace() {
+                        if !current.is_empty() {
+                            args.push(std::mem::take(&mut current));
+                        }
+                    } else {
+                        current.push(ch);
+                    }
+                }
+            }
+        }
+
+        if !current.is_empty() {
+            args.push(current);
+        }
+
+        args
+    }
+
     fn step_launch(
         instance_name: &str,
         username: &str,
@@ -1210,6 +1245,10 @@ impl super::instance::InstanceManager {
             }
         } else {
             cmd.arg(format!("-Djava.library.path={}", natives_dir.display()));
+        }
+
+        for arg in Self::split_java_args(effective_settings.java_args.as_deref().unwrap_or("")) {
+            cmd.arg(arg);
         }
 
         cmd.arg("-cp").arg(&classpath_str)
