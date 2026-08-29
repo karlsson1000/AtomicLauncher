@@ -105,7 +105,7 @@
         <div class="absolute inset-0 bg-black/80"></div>
       {/if}
 
-      <main class="flex-1 min-h-0 overflow-y-auto relative z-10">
+      <main class="flex-1 min-h-0 overflow-y-auto relative">
         {#if store.showInstanceDetails && store.selectedInstance}
           <InstanceDetailsTab
             instance={store.selectedInstance}
