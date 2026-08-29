@@ -133,14 +133,10 @@
           <div class="w-16 h-8 bg-[var(--bg-tertiary)] rounded"></div>
         </div>
       </div>
-      <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div class="grid grid-cols-3 gap-3">
         {#each skeletonItems as _}
-          <div class="bg-[var(--bg-tertiary)] rounded-md overflow-hidden">
+          <div class="rounded-md overflow-hidden">
             <div class="aspect-video bg-[var(--bg-tertiary)] animate-pulse"></div>
-            <div class="p-2 space-y-2">
-              <div class="h-3 bg-[var(--bg-tertiary)] animate-pulse rounded w-3/4"></div>
-              <div class="h-3 bg-[var(--bg-tertiary)] animate-pulse rounded w-1/2"></div>
-            </div>
           </div>
         {/each}
       </div>
@@ -229,7 +225,7 @@
           </p>
         </div>
       {:else}
-        <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div class="grid grid-cols-3 gap-3">
           {#each filteredScreenshots as screenshot, index (screenshot.path)}
             <div
               use:lazyLoad={screenshot.path}
@@ -237,42 +233,44 @@
               role="button"
               tabindex="0"
               onkeydown={(e) => { if (e.key === 'Enter') openViewer(index) }}
-              class="group relative bg-[var(--bg-tertiary)] rounded-md overflow-hidden cursor-pointer transition-all hover:bg-[var(--bg-hover)] screenshot-card"
+              class="group relative rounded-md overflow-hidden cursor-pointer screenshot-card"
             >
-              <div class="aspect-video bg-[var(--bg-secondary)] overflow-hidden relative" style="opacity: {startedImages[screenshot.path] ? 1 : 0}; transition: opacity 0.2s">
+              <div class="w-full bg-[var(--bg-secondary)] overflow-hidden relative" style="opacity: {startedImages[screenshot.path] ? 1 : 0}; transition: opacity 0.2s">
                 {#if !startedImages[screenshot.path]}
-                  <div class="absolute inset-0 bg-[var(--bg-tertiary)] animate-pulse"></div>
+                  <div class="w-full aspect-video bg-[var(--bg-tertiary)] animate-pulse"></div>
                 {:else}
                   <img
                     src={convertFileSrc(screenshot.path)}
                     alt={screenshot.filename}
-                    class="w-full h-full object-cover"
+                    class="w-full h-auto block"
                     loading="lazy"
                     decoding="async"
                   />
                 {/if}
-              </div>
-              <div class="p-2">
-                <p class="text-xs font-medium text-[var(--text-primary)] truncate mb-0.5">{screenshot.instance_name}</p>
-                <div class="flex items-center justify-between text-xs text-[var(--text-muted)]">
-                  <span>{formatDate(screenshot.timestamp)}</span>
-                  <span>{formatFileSize(screenshot.size)}</span>
+                <div class="absolute inset-x-0 bottom-0 p-2 pt-7 bg-gradient-to-t from-black/70 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                  <p class="text-xs font-medium text-white truncate">{screenshot.instance_name}</p>
+                  <div class="flex items-center justify-between text-[11px] text-white/70">
+                    <span>{formatDate(screenshot.timestamp)}</span>
+                    <span>{formatFileSize(screenshot.size)}</span>
+                  </div>
                 </div>
               </div>
               <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                 <button
                   onclick={(e) => { e.stopPropagation(); handleOpenScreenshot(screenshot); }}
-                  class="w-7 h-7 bg-[var(--bg-tertiary)]/90 hover:bg-[var(--bg-hover)] rounded flex items-center justify-center transition-colors cursor-pointer"
+                  class="w-8 h-8 flex items-center justify-center text-white cursor-pointer"
+                  style="filter: drop-shadow(0 1px 3px rgba(0,0,0,0.45)) drop-shadow(0 1px 1px rgba(0,0,0,0.35))"
                   title="Open in default viewer"
                 >
-                  <ExternalLink size={14} class="text-[var(--text-primary)]" />
+                  <ExternalLink size={18} strokeWidth={2.5} />
                 </button>
                 <button
                   onclick={(e) => { e.stopPropagation(); handleDeleteScreenshot(screenshot); }}
-                  class="w-7 h-7 bg-red-500/90 hover:bg-red-600 rounded flex items-center justify-center transition-colors cursor-pointer"
+                  class="w-8 h-8 flex items-center justify-center text-white hover:text-red-400 transition-colors cursor-pointer"
+                  style="filter: drop-shadow(0 1px 3px rgba(0,0,0,0.45)) drop-shadow(0 1px 1px rgba(0,0,0,0.35))"
                   title="Delete screenshot"
                 >
-                  <Trash2 size={14} class="text-white" />
+                  <Trash2 size={18} strokeWidth={2.5} />
                 </button>
               </div>
             </div>
@@ -282,32 +280,32 @@
     </div>
 
     {#if viewerOpen && filteredScreenshots[currentImageIndex]}
-      <div class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col">
-        <div class="absolute top-4 left-4 z-30">
-          <button onclick={closeViewer} class="w-9 h-9 hover:bg-white/10 text-white/80 hover:text-white rounded-lg flex items-center justify-center transition-colors cursor-pointer">
-            <X size={18} />
+      <div class="fixed inset-0 bg-black/80 backdrop-blur-[3px] z-50 flex flex-col" role="presentation" onclick={closeViewer} onkeydown={(e) => { if (e.key === 'Escape') closeViewer() }}>
+        <div class="absolute top-4 left-1/2 -translate-x-1/2 w-full max-w-[85vw] flex items-center justify-between z-30" role="presentation" onclick={(e) => e.stopPropagation()}>
+          <button onclick={closeViewer} class="w-9 h-9 flex items-center justify-center text-white/80 hover:text-white transition-colors cursor-pointer shrink-0" style="filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6))">
+            <X size={20} strokeWidth={2.5} />
           </button>
-        </div>
-        {#if filteredScreenshots.length > 1}
-          <span class="absolute top-4 left-[60px] py-[9px] text-sm text-gray-400 select-none z-30">{currentImageIndex + 1} / {filteredScreenshots.length}</span>
-        {/if}
-        <div class="absolute top-4 right-4 flex items-center gap-2 z-30">
-          <button onclick={() => handleOpenScreenshot(filteredScreenshots[currentImageIndex])} class="px-3 h-9 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm flex items-center gap-2 transition-colors cursor-pointer">
-            <ExternalLink size={14} />
-            Open
-          </button>
-          <button onclick={() => handleViewerDelete(filteredScreenshots[currentImageIndex])} class="px-3 h-9 bg-red-500/80 hover:bg-red-500 text-white rounded-lg text-sm flex items-center gap-2 transition-colors cursor-pointer">
-            <Trash2 size={14} />
-            Delete
-          </button>
+          {#if filteredScreenshots.length > 1}
+            <span class="text-sm text-white/70 select-none" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6))">{currentImageIndex + 1} / {filteredScreenshots.length}</span>
+          {:else}
+            <span></span>
+          {/if}
+          <div class="flex items-center gap-1 shrink-0">
+            <button onclick={() => handleOpenScreenshot(filteredScreenshots[currentImageIndex])} class="w-9 h-9 flex items-center justify-center text-white/80 hover:text-white transition-colors cursor-pointer" style="filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6))" title="Open">
+              <ExternalLink size={18} strokeWidth={2.5} />
+            </button>
+            <button onclick={() => handleViewerDelete(filteredScreenshots[currentImageIndex])} class="w-9 h-9 flex items-center justify-center text-white hover:text-red-400 cursor-pointer" style="filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6))" title="Delete">
+              <Trash2 size={18} strokeWidth={2.5} />
+            </button>
+          </div>
         </div>
 
-        <div class="flex-1 flex items-center justify-center relative min-h-0 px-4 pt-14 pb-4">
+        <div class="flex-1 flex items-center justify-center relative min-h-0 p-4">
           {#if filteredScreenshots.length > 1}
-            <button onclick={prevImage} class="absolute left-6 top-1/2 -translate-y-1/2 w-10 h-10 hover:bg-white/10 rounded-full flex items-center justify-center transition-colors cursor-pointer text-white/60 hover:text-white z-10">
+            <button onclick={(e) => { e.stopPropagation(); prevImage() }} class="absolute left-6 top-1/2 -translate-y-1/2 w-10 h-10 hover:bg-white/10 rounded-full flex items-center justify-center transition-colors cursor-pointer text-white/60 hover:text-white z-10">
               <ChevronLeft size={24} />
             </button>
-            <button onclick={nextImage} class="absolute right-6 top-1/2 -translate-y-1/2 w-10 h-10 hover:bg-white/10 rounded-full flex items-center justify-center transition-colors cursor-pointer text-white/60 hover:text-white z-10">
+            <button onclick={(e) => { e.stopPropagation(); nextImage() }} class="absolute right-6 top-1/2 -translate-y-1/2 w-10 h-10 hover:bg-white/10 rounded-full flex items-center justify-center transition-colors cursor-pointer text-white/60 hover:text-white z-10">
               <ChevronRight size={24} />
             </button>
           {/if}
@@ -315,7 +313,9 @@
             {#if !startedImages[filteredScreenshots[currentImageIndex].path]}
               <div class="w-full max-w-[900px] aspect-video bg-[var(--bg-tertiary)] animate-pulse rounded-lg"></div>
             {:else}
-              <img src={convertFileSrc(filteredScreenshots[currentImageIndex].path)} alt={filteredScreenshots[currentImageIndex].filename} class="max-w-[85vw] max-h-[83vh] object-contain rounded-md" />
+              <div role="presentation" onclick={(e) => e.stopPropagation()}>
+                <img src={convertFileSrc(filteredScreenshots[currentImageIndex].path)} alt={filteredScreenshots[currentImageIndex].filename} class="max-w-[85vw] max-h-[83vh] object-contain rounded-md" />
+              </div>
             {/if}
           </div>
         </div>
