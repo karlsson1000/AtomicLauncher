@@ -1323,6 +1323,11 @@ impl super::instance::InstanceManager {
             .await;
         });
 
+        let instance_name_for_discord = instance_name.to_string();
+        std::thread::spawn(move || {
+            crate::services::discord::set_playing(&instance_name_for_discord);
+        });
+
         if let Some(stdout) = child.stdout.take() {
             let reader = BufReader::new(stdout);
             let instance_name_clone = instance_name.to_string();
@@ -1490,6 +1495,8 @@ impl super::instance::InstanceManager {
             )
             .await;
         });
+
+        std::thread::spawn(crate::services::discord::set_in_launcher);
 
         let _ = app_handle.emit("instance-exited", serde_json::json!({
             "instance": instance_name

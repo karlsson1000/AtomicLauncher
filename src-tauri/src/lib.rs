@@ -108,6 +108,8 @@ pub fn run() {    if let Err(e) = dotenvy::dotenv() {
                 api_key: Arc::from(curseforge_api_key),
             });
 
+            std::thread::spawn(|| crate::services::discord::set_in_launcher());
+
             let fallback_window = app.get_webview_window("main");
             tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;

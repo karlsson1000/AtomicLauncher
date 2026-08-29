@@ -621,6 +621,22 @@
 
               <section class="bg-[var(--bg-elevated)] rounded-lg p-4 flex items-center justify-between gap-8">
                 <div class="min-w-0">
+                  <h4 class="text-base font-semibold text-[var(--text-primary)]">Discord Rich Presence</h4>
+                  <p class="text-xs text-[var(--text-muted)] mt-0.5">Show Octane Launcher activity on Discord</p>
+                </div>
+                <button
+                  onclick={() => handleSettingChange({ ...store.settings!, discord_rpc: !(store.settings?.discord_rpc ?? true) } as LauncherSettings)}
+                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer flex-shrink-0 {(store.settings?.discord_rpc ?? true) ? 'bg-[var(--accent-primary)]' : 'bg-[var(--bg-hover-strong)]'}"
+                  role="switch"
+                  aria-checked={(store.settings?.discord_rpc ?? true)}
+                  aria-label="Toggle Discord Rich Presence"
+                >
+                  <span class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform {(store.settings?.discord_rpc ?? true) ? 'translate-x-[22px]' : 'translate-x-0.5'}"></span>
+                </button>
+              </section>
+
+              <section class="bg-[var(--bg-elevated)] rounded-lg p-4 flex items-center justify-between gap-8">
+                <div class="min-w-0">
                   <h4 class="text-base font-semibold text-[var(--text-primary)]">Cat mode</h4>
                   <p class="text-xs text-[var(--text-muted)] mt-0.5">A cat lays down at the top of the launcher.</p>
                 </div>

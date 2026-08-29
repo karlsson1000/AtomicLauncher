@@ -43,7 +43,11 @@ pub async fn save_settings(settings: LauncherSettings) -> Result<(), String> {
     validate_memory_allocation(settings.memory_mb as u64)?;
 
     SettingsManager::save(&settings)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    std::thread::spawn(crate::services::discord::refresh);
+
+    Ok(())
 }
 
 #[tauri::command]

@@ -47,6 +47,7 @@ export interface LauncherSettings {
   theme?: string
   default_tab?: string
   cat_mode?: boolean
+  discord_rpc?: boolean
 }
 
 export interface MinecraftOptions {

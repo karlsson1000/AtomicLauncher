@@ -11,3 +11,4 @@ pub mod settings;
 pub mod accounts;
 pub mod friends;
 pub mod trash;
+pub mod discord;

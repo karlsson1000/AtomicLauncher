@@ -108,10 +108,13 @@ pub struct LauncherSettings {
     pub cat_mode: bool,
     #[serde(default)]
     pub java_args: Option<String>,
+    #[serde(default = "default_discord_rpc")]
+    pub discord_rpc: bool,
 }
 
 fn default_memory() -> u32 { 4096 }
 fn default_auto_navigate_to_console() -> bool { true }
+fn default_discord_rpc() -> bool { true }
 fn default_theme() -> String { "octane".to_string() }
 fn default_tab() -> String { "home".to_string() }
 
@@ -125,6 +128,7 @@ impl Default for LauncherSettings {
             default_tab: default_tab(),
             cat_mode: false,
             java_args: None,
+            discord_rpc: true,
         }
     }
 }
