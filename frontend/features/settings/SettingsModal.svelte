@@ -381,15 +381,15 @@
         </div>
 
         <div class="flex flex-1 min-h-0 gap-4 px-7 pb-7 pt-4">
-          <nav class="w-40 flex-shrink-0 flex flex-col gap-y-1">
+          <nav class="w-44 flex-shrink-0 flex flex-col gap-y-1">
             {#each TABS as tab (tab.id)}
               <button
                 onclick={() => { activeTab = tab.id }}
-                class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-left text-sm font-medium transition-colors cursor-pointer {activeTab === tab.id
+                class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-left text-[15px] font-medium transition-colors cursor-pointer {activeTab === tab.id
                   ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}"
               >
-                <tab.icon size={16} strokeWidth={2} class={"flex-shrink-0 " + (activeTab === tab.id ? "text-[var(--accent-primary)]" : "")} />
+                <tab.icon size={18} strokeWidth={2} class={"flex-shrink-0 " + (activeTab === tab.id ? "text-[var(--accent-primary)]" : "")} />
                 <span>{tab.label}</span>
               </button>
             {/each}
