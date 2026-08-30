@@ -59,7 +59,7 @@ pub fn unique_installer_jar(keyword: &str, full_version: &str) -> PathBuf {
     ))
 }
 
-fn kill_process_tree(pid: u32) {
+pub fn kill_process_tree(pid: u32) {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;

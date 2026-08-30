@@ -244,23 +244,8 @@ pub async fn kill_instance(instance_name: String) -> Result<(), String> {
             return Err("Invalid process PID".to_string());
         }
 
-        #[cfg(target_os = "windows")]
-        {
-            use std::process::Command;
-            let _ = Command::new("taskkill")
-                .args(&["/F", "/PID", &pid.to_string()])
-                .output();
-        }
-        
-        #[cfg(not(target_os = "windows"))]
-        {
-            if pid > 0 {
-                unsafe {
-                    libc::kill(pid as i32, libc::SIGTERM);
-                }
-            }
-        }
-        
+        crate::services::loader_common::kill_process_tree(pid);
+
         let mut processes = RUNNING_PROCESSES.lock().map_err(|e| e.to_string())?;
         processes.remove(&safe_name);
         
