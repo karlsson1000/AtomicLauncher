@@ -1,8 +1,8 @@
 <script lang="ts">
   import { fade, fly } from "svelte/transition"
   import {
-    Home, Package, Puzzle, Server, HatGlasses, Camera, Terminal,
-    Settings, Plus, Cpu, Coffee, Palette, Image, HardDrive, FolderOpen, User,
+    House, LibraryBig, Package, Blocks, Shirt, Image, Images, SquareTerminal, Terminal,
+    Settings, Plus, Cpu, Coffee, Palette, HardDrive, FolderOpen, User,
     Search,
   } from "lucide-svelte"
   import { invoke } from "@tauri-apps/api/core"
@@ -17,7 +17,7 @@
     id: string
     label: string
     hint?: string
-    icon: typeof Home
+    icon: typeof House
     keywords?: string
     disabled?: boolean
     action: () => void
@@ -41,7 +41,7 @@
     setShowSearchPalette(false)
   }
 
-  function goTab(tab: Parameters<typeof setActiveTab>[0], label: string, icon: typeof Home, extraKeywords?: string) {
+  function goTab(tab: Parameters<typeof setActiveTab>[0], label: string, icon: typeof House, extraKeywords?: string) {
     return {
       id: `tab-${tab}`,
       label,
@@ -56,13 +56,13 @@
 
   const entries = $derived.by<Entry[]>(() => {
     const list: Entry[] = [
-      goTab("home", "Home", Home),
-      goTab("instances", "Instances", Package),
-      goTab("addons", "Addons", Puzzle, "mods modpacks browse modrinth curseforge search"),
-      goTab("servers", "Servers", Server),
-      goTab("skins", "Skins", HatGlasses),
-      goTab("screenshots", "Screenshots", Camera),
-      goTab("console", "Console", Terminal),
+      goTab("home", "Home", House),
+      goTab("instances", "Instances", LibraryBig),
+      goTab("addons", "Addons", Blocks, "mods modpacks browse modrinth curseforge search"),
+      goTab("skins", "Skins", Shirt),
+      goTab("screenshots", "Screenshots", Images),
+      goTab("servers", "Servers", HardDrive),
+      goTab("console", "Console", SquareTerminal),
       {
         id: "action-new-instance",
         label: "Create New Instance",
@@ -100,7 +100,7 @@
         id: `addons-${tab}`,
         label: `Search ${tab} for "${query.trim()}"`,
         hint: "Addons",
-        icon: Puzzle,
+        icon: Blocks,
         action: () => {
           store.pendingAddonsSearch = query.trim()
           setAddonsSubTab(tab)

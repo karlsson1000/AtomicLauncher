@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Terminal, Trash2, Upload, ExternalLink, Loader2, X, PictureInPicture } from "lucide-svelte"
+  import { SquareTerminal, Trash2, Upload, ExternalLink, Loader2, X, PictureInPicture } from "lucide-svelte"
   import { invoke } from "@tauri-apps/api/core"
   import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
   import { store, handleClearConsole } from "../../lib/launcherStore.svelte"
@@ -244,7 +244,7 @@
       {:else if !activeInstance}
         <div class="h-full flex items-center justify-center">
           <div class="text-center">
-            <Terminal size={48} class="text-[var(--text-muted)] mx-auto mb-3" strokeWidth={1.5} />
+            <SquareTerminal size={48} class="text-[var(--text-muted)] mx-auto mb-3" strokeWidth={1.5} />
             <p class="text-base text-[var(--text-primary)] mb-1">No instance selected</p>
             <p class="text-sm text-[var(--text-muted)]">Select an instance tab above</p>
           </div>

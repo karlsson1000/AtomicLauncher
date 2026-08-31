@@ -2,7 +2,7 @@
   import { listen } from "@tauri-apps/api/event"
   import { invoke } from "@tauri-apps/api/core"
   import { getCurrentWindow } from "@tauri-apps/api/window"
-  import { Minus, Square, X, Terminal, Trash2, Upload, ExternalLink, Loader2, X as XIcon } from "lucide-svelte"
+  import { Minus, Square, X, SquareTerminal, Trash2, Upload, ExternalLink, Loader2, X as XIcon } from "lucide-svelte"
   import type { ConsoleLog } from "../../types"
 
   let consoleLogs = $state<ConsoleLog[]>([])
@@ -133,7 +133,7 @@
     class="h-9 flex-shrink-0 flex items-center pl-4 pr-2 gap-2 select-none"
     style="-webkit-app-region: drag"
   >
-    <Terminal size={16} strokeWidth={2} class="text-[var(--accent-primary)] flex-shrink-0" />
+    <SquareTerminal size={16} strokeWidth={2} class="text-[var(--accent-primary)] shrink-0" />
     <span class="text-sm font-medium text-[var(--text-secondary)] flex-1">
       {activeInstance ? `Console - ${activeInstance}` : "Console - Octane Launcher"}
     </span>
@@ -179,7 +179,7 @@
     {#if consoleLogs.length === 0}
       <div class="h-full flex items-center justify-center">
         <div class="text-center">
-          <Terminal size={40} class="text-[var(--accent-primary)] mx-auto mb-3" strokeWidth={1.5} />
+          <SquareTerminal size={40} class="text-[var(--accent-primary)] mx-auto mb-3" strokeWidth={1.5} />
           <p class="text-sm text-[var(--text-primary)] mb-1">Waiting for output...</p>
           <p class="text-xs text-[var(--text-muted)]">Logs will appear here when an instance launches</p>
         </div>

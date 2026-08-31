@@ -330,8 +330,8 @@ import { instanceIconSrc } from "../../lib/icons"
                       {/if}
                     </div>
                     <div class="py-2 pr-2 pl-4 flex-1 min-w-0 {(isRunning || isLaunching) ? 'pr-12' : 'group-hover:pr-12'}">
-                      <div class="text-base font-medium text-[var(--text-primary)] truncate leading-tight">{instance.name}</div>
-                      <div class="flex items-center gap-2 text-sm text-[var(--text-muted)] mt-0.5">
+                      <div class="text-[17px] font-semibold text-[var(--text-primary)] truncate leading-tight">{instance.name}</div>
+                      <div class="flex items-center gap-2 text-[15px] text-[var(--text-muted)] mt-0.5">
                         <span>{getMinecraftVersion(instance)}</span>
                         <span class="text-[var(--text-muted)]">•</span>
                         {#if instance.loader === "fabric"}
@@ -341,12 +341,12 @@ import { instanceIconSrc } from "../../lib/icons"
                           </span>
                         {:else if instance.loader === "neoforge"}
                           <span class="text-[#f97316] flex-shrink-0 flex items-center gap-1">
-                            <img src="/loaders/neoforge.png" alt="NeoForge" class="w-3 h-3" />
+                            <img src="/loaders/neoforge.png" alt="NeoForge" class="w-3.5 h-3.5" />
                             NeoForge
                           </span>
                         {:else if instance.loader === "forge"}
                           <span class="text-[#e05d2e] flex-shrink-0 flex items-center gap-1">
-                            <img src="/loaders/forge.png" alt="Forge" class="w-3 h-3" />
+                            <img src="/loaders/forge.png" alt="Forge" class="w-3.5 h-3.5" />
                             Forge
                           </span>
                         {:else}
@@ -415,8 +415,8 @@ import { instanceIconSrc } from "../../lib/icons"
                       {/if}
                     </div>
                     <div class="py-2 pr-2 pl-4 flex-1 min-w-0 {(isRunning || isLaunching) ? 'pr-12' : 'group-hover:pr-12'}">
-                      <div class="text-base font-medium text-[var(--text-primary)] truncate leading-tight">{instance.name}</div>
-                      <div class="flex items-center gap-2 text-sm text-[var(--text-muted)] mt-0.5">
+                      <div class="text-[17px] font-semibold text-[var(--text-primary)] truncate leading-tight">{instance.name}</div>
+                      <div class="flex items-center gap-2 text-[15px] text-[var(--text-muted)] mt-0.5">
                         <span>{getMinecraftVersion(instance)}</span>
                         <span class="text-[var(--text-muted)]">•</span>
                         {#if instance.loader === "fabric"}
@@ -426,12 +426,12 @@ import { instanceIconSrc } from "../../lib/icons"
                           </span>
                         {:else if instance.loader === "neoforge"}
                           <span class="text-[#f97316] flex-shrink-0 flex items-center gap-1">
-                            <img src="/loaders/neoforge.png" alt="NeoForge" class="w-3 h-3" />
+                            <img src="/loaders/neoforge.png" alt="NeoForge" class="w-3.5 h-3.5" />
                             NeoForge
                           </span>
                         {:else if instance.loader === "forge"}
                           <span class="text-[#e05d2e] flex-shrink-0 flex items-center gap-1">
-                            <img src="/loaders/forge.png" alt="Forge" class="w-3 h-3" />
+                            <img src="/loaders/forge.png" alt="Forge" class="w-3.5 h-3.5" />
                             Forge
                           </span>
                         {:else}
