@@ -280,44 +280,43 @@
     </div>
 
     {#if viewerOpen && filteredScreenshots[currentImageIndex]}
-      <div class="fixed inset-0 bg-black/80 backdrop-blur-[3px] z-50 flex flex-col" role="presentation" onclick={closeViewer} onkeydown={(e) => { if (e.key === 'Escape') closeViewer() }}>
-        <div class="absolute top-4 left-1/2 -translate-x-1/2 w-full max-w-[85vw] flex items-center justify-between z-30" role="presentation" onclick={(e) => e.stopPropagation()}>
-          <button onclick={closeViewer} class="w-9 h-9 flex items-center justify-center text-white/80 hover:text-white transition-colors cursor-pointer shrink-0" style="filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6))">
-            <X size={20} strokeWidth={2.5} />
-          </button>
-          {#if filteredScreenshots.length > 1}
-            <span class="text-sm text-white/70 select-none" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6))">{currentImageIndex + 1} / {filteredScreenshots.length}</span>
-          {:else}
-            <span></span>
-          {/if}
-          <div class="flex items-center gap-1 shrink-0">
-            <button onclick={() => handleOpenScreenshot(filteredScreenshots[currentImageIndex])} class="w-9 h-9 flex items-center justify-center text-white/80 hover:text-white transition-colors cursor-pointer" style="filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6))" title="Open">
-              <ExternalLink size={18} strokeWidth={2.5} />
-            </button>
-            <button onclick={() => handleViewerDelete(filteredScreenshots[currentImageIndex])} class="w-9 h-9 flex items-center justify-center text-white hover:text-red-400 cursor-pointer" style="filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6))" title="Delete">
-              <Trash2 size={18} strokeWidth={2.5} />
-            </button>
-          </div>
-        </div>
-
-        <div class="flex-1 flex items-center justify-center relative min-h-0 p-4">
-          {#if filteredScreenshots.length > 1}
-            <button onclick={(e) => { e.stopPropagation(); prevImage() }} class="absolute left-6 top-1/2 -translate-y-1/2 w-10 h-10 hover:bg-white/10 rounded-full flex items-center justify-center transition-colors cursor-pointer text-white/60 hover:text-white z-10">
-              <ChevronLeft size={24} />
-            </button>
-            <button onclick={(e) => { e.stopPropagation(); nextImage() }} class="absolute right-6 top-1/2 -translate-y-1/2 w-10 h-10 hover:bg-white/10 rounded-full flex items-center justify-center transition-colors cursor-pointer text-white/60 hover:text-white z-10">
-              <ChevronRight size={24} />
-            </button>
-          {/if}
-          <div class="flex items-center justify-center w-full h-full" style="opacity: {startedImages[filteredScreenshots[currentImageIndex].path] ? 1 : 0}; transition: opacity 0.2s">
+      <div class="fixed inset-0 bg-black/80 backdrop-blur-[3px] z-50 flex items-center justify-center" role="presentation" onclick={closeViewer} onkeydown={(e) => { if (e.key === 'Escape') closeViewer() }}>
+        <div class="flex flex-col items-center gap-8">
+          <div class="flex items-center justify-center w-full" style="opacity: {startedImages[filteredScreenshots[currentImageIndex].path] ? 1 : 0}; transition: opacity 0.2s">
             {#if !startedImages[filteredScreenshots[currentImageIndex].path]}
               <div class="w-full max-w-[900px] aspect-video bg-[var(--bg-tertiary)] animate-pulse rounded-lg"></div>
             {:else}
               <div role="presentation" onclick={(e) => e.stopPropagation()}>
-                <img src={convertFileSrc(filteredScreenshots[currentImageIndex].path)} alt={filteredScreenshots[currentImageIndex].filename} class="max-w-[85vw] max-h-[83vh] object-contain rounded-md" />
+                <img src={convertFileSrc(filteredScreenshots[currentImageIndex].path)} alt={filteredScreenshots[currentImageIndex].filename} class="max-w-[85vw] max-h-[80vh] object-contain rounded-md" />
               </div>
             {/if}
           </div>
+
+        <div class="relative w-full max-w-[85vw] z-30" role="presentation" onclick={(e) => e.stopPropagation()}>
+          <div class="relative flex items-center gap-2 bg-[var(--bg-elevated)]/95 backdrop-blur-md rounded-lg px-3 py-2">
+            {#if filteredScreenshots.length > 1}
+              <span class="absolute left-1/2 -translate-x-1/2 text-base text-[var(--text-secondary)] select-none whitespace-nowrap pointer-events-none">{currentImageIndex + 1} / {filteredScreenshots.length}</span>
+            {/if}
+            <button onclick={closeViewer} class="w-9 h-9 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors cursor-pointer shrink-0" title="Close">
+              <X size={24} strokeWidth={2.5} />
+            </button>
+            <span class="text-base text-[var(--text-muted)] select-none flex-1 min-w-0 truncate whitespace-nowrap">{filteredScreenshots[currentImageIndex].filename}</span>
+            <button onclick={() => handleOpenScreenshot(filteredScreenshots[currentImageIndex])} class="w-9 h-9 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors cursor-pointer shrink-0" title="Open">
+              <ExternalLink size={20} strokeWidth={2.5} />
+            </button>
+            <button onclick={() => handleViewerDelete(filteredScreenshots[currentImageIndex])} class="w-9 h-9 flex items-center justify-center text-[var(--text-secondary)] hover:text-red-400 hover:bg-[var(--bg-hover)] rounded-md transition-colors cursor-pointer shrink-0" title="Delete">
+              <Trash2 size={20} strokeWidth={2.5} />
+            </button>
+            {#if filteredScreenshots.length > 1}
+              <button onclick={prevImage} class="w-9 h-9 flex items-center justify-center rounded-md bg-[var(--bg-hover)] hover:bg-[var(--accent-primary)] hover:text-white text-[var(--text-secondary)] transition-colors cursor-pointer shrink-0" title="Previous">
+                <ChevronLeft size={24} strokeWidth={2.5} />
+              </button>
+              <button onclick={nextImage} class="w-9 h-9 flex items-center justify-center rounded-md bg-[var(--bg-hover)] hover:bg-[var(--accent-primary)] hover:text-white text-[var(--text-secondary)] transition-colors cursor-pointer shrink-0" title="Next">
+                <ChevronRight size={24} strokeWidth={2.5} />
+              </button>
+            {/if}
+          </div>
+        </div>
         </div>
       </div>
     {/if}
