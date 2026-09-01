@@ -265,6 +265,7 @@ pub fn run() {    if let Err(e) = dotenvy::dotenv() {
             get_installed_resourcepacks_with_metadata,
             get_installed_shaderpacks_with_metadata,
             get_trash_size,
+            get_trash_items,
             empty_trash,
         ])
         .run(tauri::generate_context!())

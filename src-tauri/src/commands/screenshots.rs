@@ -1,3 +1,4 @@
+use crate::services::trash::TrashManager;
 use crate::utils::get_instances_dir;
 use std::fs;
 use std::path::PathBuf;
@@ -115,8 +116,7 @@ pub async fn delete_screenshot(path: String) -> Result<(), String> {
         return Err("Screenshot does not exist".to_string());
     }
 
-    fs::remove_file(&screenshot_path)
-        .map_err(|e| format!("Failed to delete screenshot: {}", e))?;
+    TrashManager::move_file_to_trash(&screenshot_path, "screenshot").map_err(|e| e.to_string())?;
 
     Ok(())
 }

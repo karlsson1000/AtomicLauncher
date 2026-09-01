@@ -32,7 +32,9 @@ impl TrashManager {
     ) -> Result<TrashItem, Box<dyn std::error::Error>> {
         let trash_dir = get_trash_dir();
         let trash_path = trash_dir.join(folder_name);
-        let size = if trash_path.exists() {
+        let size = if trash_path.is_file() {
+            trash_path.metadata().map(|m| m.len()).unwrap_or(0)
+        } else if trash_path.exists() {
             dir_size(&trash_path)
         } else {
             0
@@ -51,6 +53,25 @@ impl TrashManager {
         index.items.push(item.clone());
         Self::save_index(&index)?;
         Ok(item)
+    }
+
+    pub fn move_file_to_trash(file_path: &std::path::Path, item_type: &str) -> Result<TrashItem, Box<dyn std::error::Error>> {
+        let trash_dir = get_trash_dir();
+        fs::create_dir_all(&trash_dir)?;
+
+        let file_name = file_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "file".to_string());
+        let folder_name = format!("{}_{}_{}", item_type, Utc::now().format("%Y%m%d_%H%M%S%3f"), file_name);
+        let trash_path = trash_dir.join(&folder_name);
+
+        if fs::rename(file_path, &trash_path).is_err() {
+            fs::copy(file_path, &trash_path)?;
+            fs::remove_file(file_path)?;
+        }
+
+        Self::add_item(&file_name, item_type, &folder_name)
     }
 
     pub fn get_all() -> Result<Vec<TrashItem>, Box<dyn std::error::Error>> {

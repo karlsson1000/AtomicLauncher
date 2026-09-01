@@ -313,6 +313,15 @@ export interface Snapshot {
   shortText?: string
 }
 
+export interface TrashItem {
+  id: string
+  original_name: string
+  original_type: string
+  folder_name: string
+  moved_at: string
+  size: number
+}
+
 export interface SnapshotsResponse {
   version: number
   entries: Snapshot[]
