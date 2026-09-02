@@ -7,7 +7,10 @@
     setSidebarContextMenu, setSelectedInstance,
     handleInstallUpdate, handleOpenSettings, handleCreateNew,
     handleOpenInstanceFolderByInstance, handleDuplicateInstance, handleDeleteInstance,
+    handleShowDetails,
   } from "../../lib/launcherStore.svelte"
+  import { instanceIconSrc } from "../../lib/icons"
+  import type { Instance } from "../../types"
 
   const tabs = [
     { id: "home" as const, icon: House, label: "Home" },
@@ -18,6 +21,18 @@
     { id: "servers" as const, icon: HardDrive, label: "Servers" },
     { id: "console" as const, icon: SquareTerminal, label: "Console" },
   ]
+
+  const recentInstances = $derived<Instance[]>(
+    [...store.instances]
+      .filter(i => i.last_played)
+      .sort((a, b) => new Date(b.last_played!).getTime() - new Date(a.last_played!).getTime())
+      .slice(0, 3)
+  )
+
+  function openRecentInstance(instance: Instance) {
+    setActiveTab("instances")
+    handleShowDetails(instance)
+  }
 </script>
 
 <div class="w-10 flex-shrink-0 flex flex-col items-center gap-1 relative z-10">
@@ -34,6 +49,26 @@
         </button>
       </Tooltip>
     {/each}
+
+    {#if recentInstances.length > 0}
+      <div class="flex flex-col items-center gap-2.5 pt-2.5 border-t border-[var(--bg-tertiary)]">
+        {#each recentInstances as instance (instance.name)}
+          {@const icon = instanceIconSrc(instance.icon_path)}
+          <Tooltip text={instance.name}>
+            <button
+              onclick={() => openRecentInstance(instance)}
+              class="w-11 h-11 flex items-center justify-center rounded-lg transition-all cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-active)]"
+            >
+              {#if icon}
+                <img src={icon} alt={instance.name} class="w-9 h-9 rounded object-cover" />
+              {:else}
+                <Package size={28} strokeWidth={2} />
+              {/if}
+            </button>
+          </Tooltip>
+        {/each}
+      </div>
+    {/if}
   </div>
 
   <div class="flex flex-col items-center gap-2">
